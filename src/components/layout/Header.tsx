@@ -12,6 +12,9 @@ export default function Header() {
         </Link>
         <nav className="flex items-center gap-4">
           <Button variant="ghost" asChild>
+            <Link href="/my-results">My Scores</Link>
+          </Button>
+          <Button variant="ghost" asChild>
             <Link href="/admin">Admin Panel</Link>
           </Button>
         </nav>
