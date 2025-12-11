@@ -16,21 +16,12 @@ interface ResultDisplayProps {
 
 export function ResultDisplay({ quiz, result }: ResultDisplayProps) {
     
-  const { score, total } = React.useMemo(() => {
-    let score = 0;
-    const mcqQuestions = quiz.questions.filter(q => q.type === 'multiple-choice');
-    
-    result.answers.forEach(userAnswer => {
-        const question = quiz.questions.find(q => q.id === userAnswer.questionId) as MultipleChoiceQuestion | undefined;
-        if (question && question.type === 'multiple-choice' && question.answer === userAnswer.answer) {
-            score++;
-        }
-    });
-
-    return { score, total: mcqQuestions.length };
+  const { score, totalMarks } = React.useMemo(() => {
+    const totalMarks = quiz.questions.reduce((sum, q) => sum + q.mark, 0);
+    return { score: result.score, totalMarks };
   }, [quiz, result]);
 
-  const percentage = total > 0 ? Math.round((score / total) * 100) : 0;
+  const percentage = totalMarks > 0 ? Math.round((score / totalMarks) * 100) : 0;
 
   return (
     <Card>
@@ -40,11 +31,11 @@ export function ResultDisplay({ quiz, result }: ResultDisplayProps) {
       </CardHeader>
       <CardContent className="space-y-8">
         <div className="flex flex-col items-center space-y-4">
-            <h3 className="text-xl font-semibold">Your Score (Multiple Choice)</h3>
+            <h3 className="text-xl font-semibold">Your Score</h3>
             <div className={`flex h-32 w-32 items-center justify-center rounded-full bg-gradient-to-br ${percentage > 70 ? 'from-green-400 to-emerald-500' : 'from-amber-400 to-orange-500'} text-white shadow-lg`}>
                 <span className="text-4xl font-bold">{percentage}%</span>
             </div>
-            <p className="text-lg text-muted-foreground">{score} out of {total} correct</p>
+            <p className="text-lg text-muted-foreground">{score} out of {totalMarks} marks</p>
         </div>
         
         <Separator />
@@ -53,16 +44,18 @@ export function ResultDisplay({ quiz, result }: ResultDisplayProps) {
             <h3 className="mb-4 text-xl font-semibold text-center">Answer Breakdown</h3>
             <div className="space-y-6">
                 {quiz.questions.map((question, index) => {
-                    const userAnswer = result.answers.find(a => a.questionId === question.id)?.answer;
-                    const isCorrect = question.type === 'multiple-choice' ? (question as MultipleChoiceQuestion).answer === userAnswer : undefined;
+                    const questionResult = result.questionResults.find(qr => qr.questionId === question.id);
+                    if (!questionResult) return null;
+
+                    const { isCorrect, userAnswer } = questionResult;
 
                     return (
                         <Card key={question.id} className={`${isCorrect === true ? 'border-green-500' : isCorrect === false ? 'border-destructive' : ''}`}>
                             <CardHeader>
                                 <CardTitle className="flex items-start justify-between text-lg">
-                                    <span>Question {index + 1}: {question.question}</span>
-                                    {isCorrect === true && <CheckCircle className="h-6 w-6 text-green-500" />}
-                                    {isCorrect === false && <XCircle className="h-6 w-6 text-destructive" />}
+                                    <span className='flex-1'>Question {index + 1}: {question.question} ({question.mark} marks)</span>
+                                    {isCorrect === true && <CheckCircle className="h-6 w-6 text-green-500 ml-4" />}
+                                    {isCorrect === false && <XCircle className="h-6 w-6 text-destructive ml-4" />}
                                 </CardTitle>
                             </CardHeader>
                             <CardContent className="space-y-2">
@@ -76,7 +69,9 @@ export function ResultDisplay({ quiz, result }: ResultDisplayProps) {
                                         <pre className="mt-2 w-full overflow-auto rounded-md bg-muted p-4 font-code text-xs">
                                             <code>{userAnswer}</code>
                                         </pre>
-                                        <p className="mt-2 text-sm text-muted-foreground">Coding questions are not auto-graded and require admin review.</p>
+                                        <p className="mt-2 text-sm text-muted-foreground">
+                                            {isCorrect ? "This submission passed the automated checks." : "This submission did not pass all automated checks."}
+                                        </p>
                                     </div>
                                 )}
                             </CardContent>

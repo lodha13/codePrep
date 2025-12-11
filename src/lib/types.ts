@@ -4,6 +4,7 @@ export interface BaseQuestion {
   id: string;
   type: QuestionType;
   question: string;
+  mark: number;
 }
 
 export interface MultipleChoiceQuestion extends BaseQuestion {
@@ -36,13 +37,21 @@ export interface Quiz {
 export type UserAnswer = {
   questionId: string;
   answer: string;
+};
+
+export type QuestionResult = {
+    questionId: string;
+    isCorrect: boolean;
+    scoreAwarded: number;
+    userAnswer: string;
 }
 
 export interface TestResult {
   id: string;
   quizId: string;
-  userId: string; // In a real app, this would be a user ID
+  userId: string;
   submittedAt: string;
   answers: UserAnswer[];
-  score?: number; // Optional, as coding questions might need manual review
+  score: number;
+  questionResults: QuestionResult[];
 }

@@ -1,13 +1,18 @@
+'use client';
+
 import Image from 'next/image';
 import Link from 'next/link';
-import { ArrowRight, Code, Component, Database } from 'lucide-react';
+import { ArrowRight, Code, Component, Database, Loader2 } from 'lucide-react';
+import { collection, getDocs, getFirestore } from 'firebase/firestore';
 
-import { getQuizzes } from '@/app/actions';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { placeholderImages } from '@/lib/placeholder-images';
 import Header from '@/components/layout/Header';
+import { useFirebase } from '@/firebase';
+import React from 'react';
+import type { Quiz } from '@/lib/types';
 
 const ICONS: { [key: string]: React.ReactNode } = {
   'Data Structures': <Database className="h-6 w-6" />,
@@ -16,9 +21,40 @@ const ICONS: { [key: string]: React.ReactNode } = {
   'default': <Code className="h-6 w-6" />,
 };
 
-export default async function Home() {
-  const quizzes = await getQuizzes();
+export default function Home() {
+  const { firestore } = useFirebase();
+  const [quizzes, setQuizzes] = React.useState<Quiz[]>([]);
+  const [loading, setLoading] = React.useState(true);
   const heroImage = placeholderImages.find((img) => img.id === 'hero');
+
+  React.useEffect(() => {
+    async function fetchQuizzes() {
+      if (!firestore) return;
+      setLoading(true);
+      try {
+        const quizzesCollection = collection(firestore, 'quizzes');
+        const quizSnapshot = await getDocs(quizzesCollection);
+        const quizzesList = quizSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Quiz));
+
+        const questionPromises = quizzesList.map(async (quiz) => {
+          const questionsCollection = collection(firestore, `quizzes/${quiz.id}/questions`);
+          const questionSnapshot = await getDocs(questionsCollection);
+          quiz.questions = questionSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
+          return quiz;
+        });
+
+        const populatedQuizzes = await Promise.all(questionPromises);
+        setQuizzes(populatedQuizzes);
+
+      } catch (error) {
+        console.error("Error fetching quizzes:", error);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchQuizzes();
+  }, [firestore]);
+
 
   return (
     <>
@@ -61,28 +97,34 @@ export default async function Home() {
               Choose a quiz to test your knowledge and prepare for your next interview.
             </p>
           </div>
-          <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
-            {quizzes.map((quiz) => (
-              <Card key={quiz.id} className="flex flex-col overflow-hidden transition-transform hover:scale-105 hover:shadow-xl">
-                <CardHeader className="flex flex-row items-center justify-between">
-                  <div>
-                    <CardTitle className="font-headline text-2xl">{quiz.title}</CardTitle>
-                    <CardDescription>{quiz.questions.length} questions</CardDescription>
-                  </div>
-                  {ICONS[quiz.skill] || ICONS.default}
-                </CardHeader>
-                <CardContent className="flex-grow">
-                  <p>{quiz.description}</p>
-                </CardContent>
-                <CardFooter className="flex flex-col items-start gap-4">
-                  <Badge variant="secondary">{quiz.skill}</Badge>
-                  <Button asChild className="w-full" variant="outline">
-                    <Link href={`/quiz/${quiz.id}`}>Start Quiz <ArrowRight className="ml-2" /></Link>
-                  </Button>
-                </CardFooter>
-              </Card>
-            ))}
-          </div>
+          {loading ? (
+            <div className="flex justify-center">
+              <Loader2 className="h-12 w-12 animate-spin" />
+            </div>
+          ) : (
+            <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
+              {quizzes.map((quiz) => (
+                <Card key={quiz.id} className="flex flex-col overflow-hidden transition-transform hover:scale-105 hover:shadow-xl">
+                  <CardHeader className="flex flex-row items-center justify-between">
+                    <div>
+                      <CardTitle className="font-headline text-2xl">{quiz.title}</CardTitle>
+                      <CardDescription>{quiz.questions.length} questions</CardDescription>
+                    </div>
+                    {ICONS[quiz.skill] || ICONS.default}
+                  </CardHeader>
+                  <CardContent className="flex-grow">
+                    <p>{quiz.description}</p>
+                  </CardContent>
+                  <CardFooter className="flex flex-col items-start gap-4">
+                    <Badge variant="secondary">{quiz.skill}</Badge>
+                    <Button asChild className="w-full" variant="outline">
+                      <Link href={`/quiz/${quiz.id}`}>Start Quiz <ArrowRight className="ml-2" /></Link>
+                    </Button>
+                  </CardFooter>
+                </Card>
+              ))}
+            </div>
+          )}
         </div>
       </section>
     </main>

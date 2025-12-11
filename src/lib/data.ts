@@ -13,6 +13,7 @@ export const quizzes: Quiz[] = [
         question: 'What is the time complexity of a binary search algorithm?',
         options: ['O(n)', 'O(log n)', 'O(n^2)', 'O(1)'],
         answer: 'O(log n)',
+        mark: 10,
       },
       {
         id: 'q2',
@@ -20,6 +21,7 @@ export const quizzes: Quiz[] = [
         question: 'Which data structure uses LIFO (Last-In, First-Out)?',
         options: ['Queue', 'Stack', 'Linked List', 'Tree'],
         answer: 'Stack',
+        mark: 10,
       },
       {
         id: 'q3',
@@ -40,6 +42,7 @@ class Solution {
           { input: '[2, 7, 11, 15], 9', expectedOutput: '[0, 1]' },
           { input: '[3, 2, 4], 6', expectedOutput: '[1, 2]' },
         ],
+        mark: 20,
       },
     ],
   },
@@ -55,6 +58,7 @@ class Solution {
         question: 'Which hook is used to manage state in a functional component?',
         options: ['useEffect', 'useState', 'useContext', 'useReducer'],
         answer: 'useState',
+        mark: 10,
       },
       {
         id: 'q2',
@@ -62,6 +66,7 @@ class Solution {
         question: 'How do you pass data from a parent component to a child component?',
         options: ['State', 'Context', 'Props', 'Redux'],
         answer: 'Props',
+        mark: 10,
       },
     ]
   }

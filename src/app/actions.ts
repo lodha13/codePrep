@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { z } from 'zod';
 import { quizzes, testResults } from '@/lib/data';
-import type { Quiz, TestResult, UserAnswer } from '@/lib/types';
+import type { Quiz, TestResult, UserAnswer, QuestionResult, CodingQuestion } from '@/lib/types';
 import { evaluateCodeSubmission } from '@/ai/flows/evaluate-code-submission';
 
 // Simulate DB calls
@@ -24,7 +24,58 @@ export async function getTestResultById(id: string): Promise<TestResult | undefi
     return Promise.resolve(testResults.find((result) => result.id === id));
 }
 
+async function evaluateCodingQuestion(code: string, question: CodingQuestion): Promise<{ passed: boolean, feedback: string }> {
+    // This is a simplified simulation. A real implementation would execute the code against test cases.
+    // Here, we'll just use AI to check for correctness conceptually.
+    const result = await evaluateCodeSubmission({ code, question: question.description });
+    
+    // A simple heuristic: if AI score is > 70, assume it passes.
+    const passed = result.score > 70;
+    return { passed, feedback: result.feedback };
+}
+
+
 export async function submitQuiz(quizId: string, answers: UserAnswer[]): Promise<void> {
+    const quiz = await getQuizById(quizId);
+    if (!quiz) {
+        throw new Error("Quiz not found");
+    }
+
+    let totalScore = 0;
+    const questionResults: QuestionResult[] = [];
+
+    for (const userAnswer of answers) {
+        const question = quiz.questions.find(q => q.id === userAnswer.questionId);
+        if (!question) continue;
+
+        let isCorrect = false;
+        let scoreAwarded = 0;
+
+        if (question.type === 'multiple-choice') {
+            if (question.answer === userAnswer.answer) {
+                isCorrect = true;
+                scoreAwarded = question.mark;
+                totalScore += question.mark;
+            }
+        } else if (question.type === 'coding') {
+            // In a real app, this would involve a secure code execution environment.
+            // For now, we simulate with a simple correctness check.
+            const { passed } = await evaluateCodingQuestion(userAnswer.answer, question);
+            if(passed){
+                isCorrect = true;
+                scoreAwarded = question.mark;
+                totalScore += question.mark;
+            }
+        }
+
+        questionResults.push({
+            questionId: question.id,
+            isCorrect,
+            scoreAwarded,
+            userAnswer: userAnswer.answer,
+        });
+    }
+
     const newResultId = `res-${Date.now()}`;
     const newResult: TestResult = {
         id: newResultId,
@@ -32,6 +83,8 @@ export async function submitQuiz(quizId: string, answers: UserAnswer[]): Promise
         userId: 'user-123', // Mock user ID
         submittedAt: new Date().toISOString(),
         answers,
+        score: totalScore,
+        questionResults,
     };
     testResults.push(newResult);
     redirect(`/quiz/results/${newResultId}`);
