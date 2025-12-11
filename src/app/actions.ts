@@ -3,17 +3,21 @@
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { z } from 'zod';
-import { quizzes, testResults } from '@/lib/data';
-import type { Quiz, TestResult, UserAnswer, QuestionResult, CodingQuestion } from '@/lib/types';
+import { quizzes as mockQuizzes, testResults } from '@/lib/data';
+import type { Quiz, TestResult, UserAnswer, QuestionResult, CodingQuestion, Question } from '@/lib/types';
 import { evaluateCodeSubmission } from '@/ai/flows/evaluate-code-submission';
+import { getFirestore, collection, writeBatch, doc } from 'firebase/firestore';
+import { initializeFirebase } from '@/firebase';
 
 // Simulate DB calls
 export async function getQuizzes(): Promise<Quiz[]> {
-  return Promise.resolve(quizzes);
+  // This is now a mock function, data is fetched client-side from Firestore
+  return Promise.resolve([]);
 }
 
 export async function getQuizById(id: string): Promise<Quiz | undefined> {
-  return Promise.resolve(quizzes.find((quiz) => quiz.id === id));
+    // This is now a mock function, data is fetched client-side from Firestore
+  return Promise.resolve(mockQuizzes.find((quiz) => quiz.id === id));
 }
 
 export async function getTestResults(): Promise<TestResult[]> {
@@ -24,14 +28,16 @@ export async function getTestResultById(id: string): Promise<TestResult | undefi
     return Promise.resolve(testResults.find((result) => result.id === id));
 }
 
-async function evaluateCodingQuestion(code: string, question: CodingQuestion): Promise<{ passed: boolean, feedback: string }> {
-    // This is a simplified simulation. A real implementation would execute the code against test cases.
-    // Here, we'll just use AI to check for correctness conceptually.
+async function evaluateCodingQuestion(code: string, question: CodingQuestion): Promise<{ passed: boolean, feedback: string, score: number }> {
     const result = await evaluateCodeSubmission({ code, question: question.description });
     
-    // A simple heuristic: if AI score is > 70, assume it passes.
+    // Logic to check test cases.
+    // THIS IS A SIMULATION. In a real-world scenario, you'd run the code in a sandbox.
+    // For now, we'll assume AI gives a good enough estimation.
+    // Let's say score > 70 means all test cases passed.
     const passed = result.score > 70;
-    return { passed, feedback: result.feedback };
+    
+    return { passed, feedback: result.feedback, score: result.score };
 }
 
 
@@ -58,8 +64,6 @@ export async function submitQuiz(quizId: string, answers: UserAnswer[]): Promise
                 totalScore += question.mark;
             }
         } else if (question.type === 'coding') {
-            // In a real app, this would involve a secure code execution environment.
-            // For now, we simulate with a simple correctness check.
             const { passed } = await evaluateCodingQuestion(userAnswer.answer, question);
             if(passed){
                 isCorrect = true;
@@ -90,6 +94,31 @@ export async function submitQuiz(quizId: string, answers: UserAnswer[]): Promise
     redirect(`/quiz/results/${newResultId}`);
 }
 
+export async function seedDatabase() {
+  try {
+    const { firestore } = initializeFirebase();
+    const batch = writeBatch(firestore);
+
+    for (const quiz of mockQuizzes) {
+      const { questions, ...quizData } = quiz;
+      const quizRef = doc(firestore, 'quizzes', quiz.id);
+      batch.set(quizRef, quizData);
+
+      for (const question of questions) {
+        const questionRef = doc(firestore, `quizzes/${quiz.id}/questions`, question.id);
+        batch.set(questionRef, question);
+      }
+    }
+    await batch.commit();
+    revalidatePath('/admin');
+    revalidatePath('/');
+    return { success: true, message: 'Database seeded successfully!' };
+  } catch (error: any) {
+    console.error('Error seeding database:', error);
+    return { success: false, message: `Failed to seed database: ${error.message}` };
+  }
+}
+
 const quizUploadSchema = z.array(z.any());
 
 export async function uploadQuizzes(formData: FormData) {
@@ -101,7 +130,23 @@ export async function uploadQuizzes(formData: FormData) {
     
     // In a real app, you would validate and save this to your database.
     // Here, we just add it to our mock data array.
-    parsedQuizzes.forEach(q => quizzes.push(q as Quiz));
+    const { firestore } = initializeFirebase();
+    const batch = writeBatch(firestore);
+
+    parsedQuizzes.forEach((quiz: Quiz) => {
+        const { questions, ...quizData } = quiz;
+        const quizRef = doc(firestore, 'quizzes', quiz.id);
+        batch.set(quizRef, quizData);
+
+        if (questions) {
+            questions.forEach((question: Question) => {
+                const questionRef = doc(firestore, `quizzes/${quiz.id}/questions`, question.id);
+                batch.set(questionRef, question);
+            });
+        }
+    });
+
+    await batch.commit();
     
     revalidatePath('/admin/quizzes');
     revalidatePath('/');
@@ -114,7 +159,8 @@ export async function uploadQuizzes(formData: FormData) {
     if (error instanceof SyntaxError) {
       return { success: false, message: 'Invalid JSON content. Please check for syntax errors.' };
     }
-    return { success: false, message: 'An unexpected error occurred.' };
+    console.error(error);
+    return { success: false, message: 'An unexpected error occurred during quiz upload.' };
   }
 }
 

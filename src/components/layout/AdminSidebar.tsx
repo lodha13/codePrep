@@ -40,9 +40,12 @@ export function AdminSidebar() {
                 <SidebarMenuButton
                   isActive={pathname === item.href}
                   tooltip={item.label}
+                  asChild
                 >
-                  <item.icon />
-                  <span>{item.label}</span>
+                  <div>
+                    <item.icon />
+                    <span>{item.label}</span>
+                  </div>
                 </SidebarMenuButton>
               </Link>
             </SidebarMenuItem>
