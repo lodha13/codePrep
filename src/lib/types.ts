@@ -40,7 +40,9 @@ export type UserAnswer = {
 };
 
 export type QuestionResult = {
+    id: string;
     questionId: string;
+    testResultId: string;
     isCorrect: boolean;
     scoreAwarded: number;
     userAnswer: string;
@@ -50,8 +52,7 @@ export interface TestResult {
   id: string;
   quizId: string;
   userId: string;
-  submittedAt: string;
-  answers: UserAnswer[];
+  submittedAt: string; // ISO 8601 format
   score: number;
-  questionResults: QuestionResult[];
+  questionResults: (QuestionResult[] | string[]); // Can be populated object or just IDs
 }

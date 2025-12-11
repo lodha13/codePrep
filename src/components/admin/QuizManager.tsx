@@ -11,7 +11,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
-import { Upload } from 'lucide-react';
+import { Loader2, Upload } from 'lucide-react';
 
 const formSchema = z.object({
   quizJson: z.string().min(1, 'JSON content cannot be empty.'),
@@ -24,7 +24,37 @@ export function QuizManager() {
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      quizJson: '[\n  {\n    "id": "java-1",\n    "title": "Core Java Concepts",\n    "description": "Fundamental questions about the Java programming language.",\n    "skill": "Java",\n    "questions": [\n      {\n        "id": "q1",\n        "type": "multiple-choice",\n        "question": "Which of these is NOT a primitive type in Java?",\n        "options": ["int", "String", "boolean", "char"],\n        "answer": "String"\n      }\n    ]\n  }\n]',
+      quizJson: `[
+  {
+    "id": "java-1",
+    "title": "Core Java Concepts",
+    "description": "Fundamental questions about the Java programming language.",
+    "skill": "Java",
+    "questions": [
+      {
+        "id": "q1",
+        "type": "multiple-choice",
+        "question": "Which of these is NOT a primitive type in Java?",
+        "options": ["int", "String", "boolean", "char"],
+        "answer": "String",
+        "mark": 10
+      },
+      {
+        "id": "q2",
+        "type": "coding",
+        "question": "Reverse a String",
+        "description": "Write a function that reverses a string.",
+        "language": "java",
+        "template": "class Solution { public String reverseString(String s) { // your code here } }",
+        "testCases": [
+          { "input": "hello", "expectedOutput": "olleh" },
+          { "input": "Java", "expectedOutput": "avaJ" }
+        ],
+        "mark": 20
+      }
+    ]
+  }
+]`,
     },
   });
 
@@ -40,7 +70,8 @@ export function QuizManager() {
           title: 'Success!',
           description: result.message,
         });
-        form.reset();
+        // Optionally reset form
+        // form.reset();
       } else {
         toast({
           title: 'Error',
@@ -55,7 +86,7 @@ export function QuizManager() {
     <Card>
       <CardHeader>
         <CardTitle>Upload New Quizzes</CardTitle>
-        <CardDescription>Paste the quiz data in JSON format below. The new quizzes will be added to the existing list.</CardDescription>
+        <CardDescription>Paste the quiz data in JSON format below. Ensure each question has a "mark" attribute. The new quizzes will be added to the existing list.</CardDescription>
       </CardHeader>
       <CardContent>
         <Form {...form}>
@@ -78,7 +109,8 @@ export function QuizManager() {
               )}
             />
             <Button type="submit" disabled={isPending}>
-              {isPending ? 'Uploading...' : 'Upload Quizzes'} <Upload className="ml-2" />
+              {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
+              {isPending ? 'Uploading...' : 'Upload Quizzes'}
             </Button>
           </form>
         </Form>

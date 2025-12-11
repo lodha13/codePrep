@@ -12,6 +12,19 @@ import { useToast } from '@/hooks/use-toast';
 import type { Quiz, UserAnswer } from '@/lib/types';
 import { CodingQuestion } from './CodingQuestion';
 import { MultipleChoiceQuestion } from './MultipleChoiceQuestion';
+import { useFirebase } from '@/firebase';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
+
 
 interface QuizRunnerProps {
   quiz: Quiz;
@@ -22,6 +35,7 @@ export function QuizRunner({ quiz }: QuizRunnerProps) {
   const [answers, setAnswers] = React.useState<UserAnswer[]>([]);
   const [isPending, startTransition] = useTransition();
   const { toast } = useToast();
+  const { user, isUserLoading } = useFirebase();
 
   const currentQuestion = quiz.questions[currentQuestionIndex];
   const progress = ((currentQuestionIndex + 1) / quiz.questions.length) * 100;
@@ -51,7 +65,15 @@ export function QuizRunner({ quiz }: QuizRunnerProps) {
   };
 
   const handleSubmit = () => {
-    if(answers.length !== quiz.questions.length) {
+    if (!user) {
+        toast({
+            title: "Not Authenticated",
+            description: "You must be logged in to submit a quiz.",
+            variant: "destructive",
+        });
+        return;
+    }
+    if (answers.length !== quiz.questions.length) {
       toast({
         title: "Incomplete Quiz",
         description: "Please answer all questions before submitting.",
@@ -60,7 +82,7 @@ export function QuizRunner({ quiz }: QuizRunnerProps) {
       return;
     }
     startTransition(async () => {
-      await submitQuiz(quiz.id, answers);
+      await submitQuiz(quiz.id, user.uid, answers);
     });
   };
 
@@ -86,9 +108,25 @@ export function QuizRunner({ quiz }: QuizRunnerProps) {
           <ArrowLeft className="mr-2" /> Previous
         </Button>
         {currentQuestionIndex === quiz.questions.length - 1 ? (
-          <Button variant="accent" onClick={handleSubmit} disabled={isPending}>
-            {isPending ? 'Submitting...' : 'Submit Quiz'} <Check className="ml-2" />
-          </Button>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+                <Button variant="accent" disabled={isPending || isUserLoading}>
+                    {isPending ? 'Submitting...' : 'Submit Quiz'} <Check className="ml-2" />
+                </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+                <AlertDialogHeader>
+                    <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                        This action cannot be undone. This will submit your quiz for grading.
+                    </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleSubmit}>Continue</AlertDialogAction>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         ) : (
           <Button onClick={handleNext}>
             Next <ArrowRight className="ml-2" />

@@ -6,8 +6,9 @@ import { z } from 'zod';
 import { quizzes as mockQuizzes, testResults } from '@/lib/data';
 import type { Quiz, TestResult, UserAnswer, QuestionResult, CodingQuestion, Question } from '@/lib/types';
 import { evaluateCodeSubmission } from '@/ai/flows/evaluate-code-submission';
-import { getFirestore, collection, writeBatch, doc } from 'firebase/firestore';
+import { getFirestore, collection, writeBatch, doc, addDoc, serverTimestamp } from 'firebase/firestore';
 import { initializeFirebase } from '@/firebase';
+import { evaluateCodeAgainstTestCases, TestCaseResult } from '@/ai/flows/evaluate-code-against-test-cases';
 
 // Simulate DB calls
 export async function getQuizzes(): Promise<Quiz[]> {
@@ -28,20 +29,29 @@ export async function getTestResultById(id: string): Promise<TestResult | undefi
     return Promise.resolve(testResults.find((result) => result.id === id));
 }
 
-async function evaluateCodingQuestion(code: string, question: CodingQuestion): Promise<{ passed: boolean, feedback: string, score: number }> {
-    const result = await evaluateCodeSubmission({ code, question: question.description });
+async function evaluateCodingQuestion(code: string, question: CodingQuestion): Promise<{ passed: boolean, feedback: string, score: number, testCaseResults: TestCaseResult[] }> {
+    const result = await evaluateCodeAgainstTestCases({
+      code,
+      language: question.language,
+      testCases: question.testCases.map(tc => JSON.stringify(tc))
+    });
+
+    const passedCount = result.results.filter(r => r.passed).length;
+    const totalTestCases = question.testCases.length;
+    const passed = passedCount === totalTestCases;
+    const score = totalTestCases > 0 ? (passedCount / totalTestCases) * question.mark : 0;
     
-    // Logic to check test cases.
-    // THIS IS A SIMULATION. In a real-world scenario, you'd run the code in a sandbox.
-    // For now, we'll assume AI gives a good enough estimation.
-    // Let's say score > 70 means all test cases passed.
-    const passed = result.score > 70;
+    // We can get more detailed feedback from another flow if needed
+    const feedback = passed ? "All test cases passed!" : `${passedCount} out of ${totalTestCases} test cases passed.`;
     
-    return { passed, feedback: result.feedback, score: result.score };
+    return { passed, feedback, score, testCaseResults: result.results };
 }
 
 
-export async function submitQuiz(quizId: string, answers: UserAnswer[]): Promise<void> {
+export async function submitQuiz(quizId: string, userId: string, answers: UserAnswer[]): Promise<void> {
+    const { firestore } = initializeFirebase();
+    // In a real app, you would fetch the quiz from firestore here to ensure data integrity
+    // For now, we will rely on mock data for question details like `mark` and `answer`
     const quiz = await getQuizById(quizId);
     if (!quiz) {
         throw new Error("Quiz not found");
@@ -49,6 +59,7 @@ export async function submitQuiz(quizId: string, answers: UserAnswer[]): Promise
 
     let totalScore = 0;
     const questionResults: QuestionResult[] = [];
+    const newResultId = doc(collection(firestore, 'testResults')).id;
 
     for (const userAnswer of answers) {
         const question = quiz.questions.find(q => q.id === userAnswer.questionId);
@@ -56,6 +67,8 @@ export async function submitQuiz(quizId: string, answers: UserAnswer[]): Promise
 
         let isCorrect = false;
         let scoreAwarded = 0;
+        const questionResultId = doc(collection(firestore, `testResults/${newResultId}/questionResults`)).id;
+
 
         if (question.type === 'multiple-choice') {
             if (question.answer === userAnswer.answer) {
@@ -64,15 +77,15 @@ export async function submitQuiz(quizId: string, answers: UserAnswer[]): Promise
                 totalScore += question.mark;
             }
         } else if (question.type === 'coding') {
-            const { passed } = await evaluateCodingQuestion(userAnswer.answer, question);
-            if(passed){
-                isCorrect = true;
-                scoreAwarded = question.mark;
-                totalScore += question.mark;
-            }
+            const { passed, score } = await evaluateCodingQuestion(userAnswer.answer, question);
+            isCorrect = passed; // Only correct if all test cases pass
+            scoreAwarded = score;
+            totalScore += score;
         }
 
         questionResults.push({
+            id: questionResultId,
+            testResultId: newResultId,
             questionId: question.id,
             isCorrect,
             scoreAwarded,
@@ -80,17 +93,24 @@ export async function submitQuiz(quizId: string, answers: UserAnswer[]): Promise
         });
     }
 
-    const newResultId = `res-${Date.now()}`;
-    const newResult: TestResult = {
-        id: newResultId,
+    const newResult: Omit<TestResult, 'id'> = {
         quizId,
-        userId: 'user-123', // Mock user ID
-        submittedAt: new Date().toISOString(),
-        answers,
+        userId: userId, // Use authenticated user ID
+        submittedAt: new Date().toISOString(), // Use server timestamp in real app
         score: totalScore,
-        questionResults,
+        questionResults: questionResults.map(qr => qr.id), // Store references
     };
-    testResults.push(newResult);
+    
+    const batch = writeBatch(firestore);
+    const testResultRef = doc(firestore, "testResults", newResultId);
+    batch.set(testResultRef, newResult);
+
+    for(const qr of questionResults) {
+        const qrRef = doc(firestore, `testResults/${newResultId}/questionResults`, qr.id);
+        batch.set(qrRef, qr);
+    }
+    
+    await batch.commit();
     redirect(`/quiz/results/${newResultId}`);
 }
 
@@ -134,6 +154,11 @@ export async function uploadQuizzes(formData: FormData) {
     const batch = writeBatch(firestore);
 
     parsedQuizzes.forEach((quiz: Quiz) => {
+        // Validate that each question has a 'mark'
+        if (quiz.questions.some(q => typeof q.mark !== 'number')) {
+            throw new Error(`One or more questions in quiz '${quiz.title}' is missing a 'mark'.`);
+        }
+
         const { questions, ...quizData } = quiz;
         const quizRef = doc(firestore, 'quizzes', quiz.id);
         batch.set(quizRef, quizData);
@@ -152,7 +177,7 @@ export async function uploadQuizzes(formData: FormData) {
     revalidatePath('/');
 
     return { success: true, message: 'Quizzes uploaded successfully!' };
-  } catch (error) {
+  } catch (error: any) {
     if (error instanceof z.ZodError) {
       return { success: false, message: `Invalid JSON format: ${error.errors.map(e => e.message).join(', ')}` };
     }
@@ -160,7 +185,7 @@ export async function uploadQuizzes(formData: FormData) {
       return { success: false, message: 'Invalid JSON content. Please check for syntax errors.' };
     }
     console.error(error);
-    return { success: false, message: 'An unexpected error occurred during quiz upload.' };
+    return { success: false, message: `An unexpected error occurred during quiz upload: ${error.message}` };
   }
 }
 
