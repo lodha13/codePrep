@@ -1,138 +1,143 @@
-'use client';
+"use client";
 
-import * as React from 'react';
-import { useTransition } from 'react';
-import { ArrowLeft, ArrowRight, Check } from 'lucide-react';
-
-import { submitQuiz } from '@/app/actions';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card';
-import { Progress } from '@/components/ui/progress';
-import { useToast } from '@/hooks/use-toast';
-import type { Quiz, UserAnswer } from '@/lib/types';
-import { CodingQuestion } from './CodingQuestion';
-import { MultipleChoiceQuestion } from './MultipleChoiceQuestion';
-import { useFirebase } from '@/firebase';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog"
-
+import { useState, useEffect } from "react";
+import { Quiz, Question, QuestionResult, QuizResult } from "@/types/schema";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import MCQView from "./MCQView";
+import CodingView from "./CodingView";
+import { doc, setDoc, Timestamp } from "firebase/firestore";
+import { db } from "@/lib/firebase";
+import { useAuth } from "@/context/AuthContext";
+import { useRouter } from "next/navigation";
 
 interface QuizRunnerProps {
-  quiz: Quiz;
+    quiz: Quiz;
+    questions: Question[];
 }
 
-export function QuizRunner({ quiz }: QuizRunnerProps) {
-  const [currentQuestionIndex, setCurrentQuestionIndex] = React.useState(0);
-  const [answers, setAnswers] = React.useState<UserAnswer[]>([]);
-  const [isPending, startTransition] = useTransition();
-  const { toast } = useToast();
-  const { user, isUserLoading } = useFirebase();
+export default function QuizRunner({ quiz, questions }: QuizRunnerProps) {
+    const [currentIndex, setCurrentIndex] = useState(0);
+    const [answers, setAnswers] = useState<Record<string, string>>({});
+    const [submitting, setSubmitting] = useState(false);
+    const { user } = useAuth();
+    const router = useRouter();
 
-  const currentQuestion = quiz.questions[currentQuestionIndex];
-  const progress = ((currentQuestionIndex + 1) / quiz.questions.length) * 100;
+    const currentQuestion = questions[currentIndex];
+    const isLastQuestion = currentIndex === questions.length - 1;
 
-  const handleAnswerChange = (answer: string) => {
-    setAnswers((prev) => {
-      const existingAnswerIndex = prev.findIndex((a) => a.questionId === currentQuestion.id);
-      if (existingAnswerIndex !== -1) {
-        const newAnswers = [...prev];
-        newAnswers[existingAnswerIndex] = { questionId: currentQuestion.id, answer };
-        return newAnswers;
-      }
-      return [...prev, { questionId: currentQuestion.id, answer }];
-    });
-  };
+    const handleAnswer = (val: string) => {
+        setAnswers(prev => ({ ...prev, [currentQuestion.id]: val }));
+    };
 
-  const handleNext = () => {
-    if (currentQuestionIndex < quiz.questions.length - 1) {
-      setCurrentQuestionIndex(currentQuestionIndex + 1);
-    }
-  };
+    const handleNext = () => {
+        if (!isLastQuestion) setCurrentIndex(prev => prev + 1);
+    };
 
-  const handlePrev = () => {
-    if (currentQuestionIndex > 0) {
-      setCurrentQuestionIndex(currentQuestionIndex - 1);
-    }
-  };
+    const handlePrev = () => {
+        if (currentIndex > 0) setCurrentIndex(prev => prev - 1);
+    };
 
-  const handleSubmit = () => {
-    if (!user) {
-        toast({
-            title: "Not Authenticated",
-            description: "You must be logged in to submit a quiz.",
-            variant: "destructive",
+    const calculateScore = () => {
+        let score = 0;
+        const results: Record<string, QuestionResult> = {};
+
+        questions.forEach(q => {
+            const ans = answers[q.id];
+            let isCorrect = false;
+
+            if (q.type === 'mcq') {
+                isCorrect = ans === q.correctOptionIndex.toString();
+            } else if (q.type === 'coding') {
+                // Simplified checking for prototype: if any code was written
+                // In production, this would be a backend verification
+                isCorrect = !!ans && ans.length > 10;
+            }
+
+            if (isCorrect) score += 1; // Simple 1 point per question
+
+            results[q.id] = {
+                questionId: q.id,
+                timeTakenSeconds: 0, // Track time if needed
+                status: isCorrect ? 'correct' : 'incorrect',
+                score: isCorrect ? 1 : 0,
+                userAnswer: ans,
+            };
         });
-        return;
-    }
-    if (answers.length !== quiz.questions.length) {
-      toast({
-        title: "Incomplete Quiz",
-        description: "Please answer all questions before submitting.",
-        variant: "destructive",
-      });
-      return;
-    }
-    startTransition(async () => {
-      await submitQuiz(quiz.id, user.uid, answers);
-    });
-  };
+        return { score, results };
+    };
 
-  const currentAnswer = answers.find(a => a.questionId === currentQuestion.id)?.answer || '';
+    const handleSubmit = async () => {
+        if (!user) return;
+        setSubmitting(true);
 
-  return (
-    <Card className="overflow-hidden">
-      <CardHeader>
-        <div className="flex items-center justify-between">
-            <p className="text-sm text-muted-foreground">Question {currentQuestionIndex + 1} of {quiz.questions.length}</p>
+        const { score, results } = calculateScore();
+        const resultId = `${quiz.id}_${user.uid}_${Date.now()}`;
+
+        const resultData: QuizResult = {
+            id: resultId,
+            quizId: quiz.id,
+            userId: user.uid,
+            startedAt: Timestamp.now(), // Approximate
+            completedAt: Timestamp.now(),
+            score,
+            totalScore: questions.length,
+            status: "completed",
+            answers: results,
+        };
+
+        await setDoc(doc(db, "results", resultId), resultData);
+        router.push(`/results/${resultId}`);
+    };
+
+    return (
+        <div className="max-w-5xl mx-auto p-6">
+            <div className="flex justify-between items-center mb-6">
+                <div>
+                    <h1 className="text-2xl font-bold">{quiz.title}</h1>
+                    <p className="text-gray-500">Question {currentIndex + 1} of {questions.length}</p>
+                </div>
+                <div className="text-xl font-mono bg-gray-100 px-3 py-1 rounded">
+                    {/* Timer would go here */}
+                    60:00
+                </div>
+            </div>
+
+            <Card className="min-h-[600px] flex flex-col">
+                <CardHeader>
+                    <CardTitle className="text-lg">{currentQuestion.title}</CardTitle>
+                    <div className="text-gray-600 prose" dangerouslySetInnerHTML={{ __html: currentQuestion.description }} />
+                </CardHeader>
+                <CardContent className="flex-1">
+                    {currentQuestion.type === 'mcq' ? (
+                        <MCQView
+                            question={currentQuestion}
+                            selectedOption={answers[currentQuestion.id]}
+                            onSelect={handleAnswer}
+                        />
+                    ) : (
+                        <CodingView
+                            question={currentQuestion}
+                            currentCode={answers[currentQuestion.id] || currentQuestion.starterCode}
+                            onCodeChange={handleAnswer}
+                        />
+                    )}
+                </CardContent>
+                <CardFooter className="flex justify-between border-t pt-6 bg-gray-50">
+                    <Button variant="outline" onClick={handlePrev} disabled={currentIndex === 0}>
+                        Previous
+                    </Button>
+                    {isLastQuestion ? (
+                        <Button onClick={handleSubmit} disabled={submitting}>
+                            {submitting ? "Submitting..." : "Submit Quiz"}
+                        </Button>
+                    ) : (
+                        <Button onClick={handleNext}>
+                            Next
+                        </Button>
+                    )}
+                </CardFooter>
+            </Card>
         </div>
-        <Progress value={progress} className="mt-2" />
-      </CardHeader>
-      <CardContent>
-        {currentQuestion.type === 'multiple-choice' ? (
-          <MultipleChoiceQuestion question={currentQuestion} onAnswerChange={handleAnswerChange} selectedAnswer={currentAnswer} />
-        ) : (
-          <CodingQuestion question={currentQuestion} onAnswerChange={handleAnswerChange} codeAnswer={currentAnswer} />
-        )}
-      </CardContent>
-      <CardFooter className="flex justify-between">
-        <Button variant="outline" onClick={handlePrev} disabled={currentQuestionIndex === 0}>
-          <ArrowLeft className="mr-2" /> Previous
-        </Button>
-        {currentQuestionIndex === quiz.questions.length - 1 ? (
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-                <Button variant="accent" disabled={isPending || isUserLoading}>
-                    {isPending ? 'Submitting...' : 'Submit Quiz'} <Check className="ml-2" />
-                </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-                <AlertDialogHeader>
-                    <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                    <AlertDialogDescription>
-                        This action cannot be undone. This will submit your quiz for grading.
-                    </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                    <AlertDialogAction onClick={handleSubmit}>Continue</AlertDialogAction>
-                </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-        ) : (
-          <Button onClick={handleNext}>
-            Next <ArrowRight className="ml-2" />
-          </Button>
-        )}
-      </CardFooter>
-    </Card>
-  );
+    );
 }
