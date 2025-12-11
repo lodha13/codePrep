@@ -1,0 +1,156 @@
+/**
+ * This ruleset enforces a security model for the CodePrep Pro application.
+ *
+ * Core Philosophy:
+ * The security model is based on a strict separation of user-private data and
+ * public application content. Users have full control over their own data, such as
+ * test results and assigned tests, while shared content like quizzes and questions
+ * is readable by any authenticated user but managed centrally.
+ *
+ * Data Structure:
+ * - User-specific data is nested under `/users/{userId}`. This includes their profile,
+ *   their assigned tests (`assignedTests`), and their test results (`testResults`).
+ * - Publicly consumable content, like quizzes and questions, is stored in top-level
+ *   collections (`/quizzes`, `/questions`) to allow for efficient, secure querying
+ *   by all users.
+ * - Individual question results are nested under a top-level `/testResults`
+ *   collection. This structure requires security rules to perform a lookup on the
+ *   parent `testResult` document to verify ownership before granting access.
+ *
+ * Key Security Decisions:
+ * - User Enumeration: Listing documents in the top-level `/users` collection is
+ *   explicitly disallowed to protect user privacy.
+ * - Signed-In Access: All operations, including reading public content, require
+ *   the user to be authenticated. There is no anonymous access.
+ * - Content Management: The creation and modification of public content (Quizzes, Questions)
+ *   are currently disabled pending the implementation of an admin role. This ensures
+ *   data integrity by defaulting to a secure, locked-down state.
+ * - Read-Only Assignments: Users can read tests assigned to them, but cannot modify
+ *   or delete the assignment records themselves, ensuring assignments are controlled
+ *   by the system or an administrator.
+ */
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper functions for reusable logic
+    /**
+     * isSignedIn
+     * Checks if the user is authenticated.
+     */
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    /**
+     * isOwner
+     * Checks if the authenticated user's UID matches the provided userId.
+     */
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    /**
+     * isExistingOwner
+     * Checks for ownership on a document that is expected to exist.
+     * Crucial for secure update and delete operations.
+     */
+    function isExistingOwner(userId) {
+      return isOwner(userId) && resource != null;
+    }
+
+    /**
+     * isParentTestResultOwner
+     * Checks if the user owns the parent testResult document.
+     * This requires an additional read (get) operation.
+     */
+    function isParentTestResultOwner(testResultId) {
+      return isSignedIn() && get(/databases/$(database)/documents/testResults/$(testResultId)).data.userId == request.auth.uid;
+    }
+
+
+    /**
+     * @description Manages user profile data.
+     * @path /users/{userId}
+     * @allow (create) A new user can create their own profile document. `auth.uid` must match `{userId}`.
+     * @deny (list) An authenticated user cannot list all other users in the database.
+     * @principle Restricts access to a user's own data tree and prevents user enumeration.
+     */
+    match /users/{userId} {
+      allow get: if isOwner(userId);
+      allow list: if false;
+      allow create: if isOwner(userId) && request.resource.data.id == userId;
+      allow update: if isExistingOwner(userId) && request.resource.data.id == resource.data.id;
+      allow delete: if isExistingOwner(userId);
+    }
+
+    /**
+     * @description Defines quizzes that are available to users.
+     * @path /quizzes/{quizId}
+     * @allow (get, list) Any signed-in user can read quiz definitions.
+     * @deny (create, update, delete) All write operations are denied because there is no admin role defined.
+     * @principle Implements a public-read model with locked-down writes for data integrity.
+     */
+    match /quizzes/{quizId} {
+      allow get, list: if isSignedIn();
+      // CRITICAL: Cannot implement owner-only writes. The 'Quiz' entity is missing an 'ownerId' or 'creatorId' field.
+      allow create, update, delete: if false; // TODO: Add admin role validation once the schema is updated with an ownership/admin model.
+    }
+
+    /**
+     * @description Defines individual questions that belong to quizzes.
+     * @path /questions/{questionId}
+     * @allow (get, list) Any signed-in user can read question data.
+     * @deny (create, update, delete) All write operations are denied to protect content integrity.
+     * @principle Implements a public-read model with locked-down writes for data integrity.
+     */
+    match /questions/{questionId} {
+      allow get, list: if isSignedIn();
+      // CRITICAL: Cannot implement owner-only writes. The 'Question' entity is missing an 'ownerId' or 'creatorId' field.
+      allow create, update, delete: if false; // TODO: Add admin role validation once the schema is updated with an ownership/admin model.
+    }
+
+    /**
+     * @description Stores the results of a quiz taken by a user.
+     * @path /users/{userId}/testResults/{testResultId}
+     * @allow (create, get, list, update, delete) A user can fully manage their own test results.
+     * @deny (get) A user cannot access another user's test results.
+     * @principle Enforces strict document ownership within a user's private data tree.
+     */
+    match /users/{userId}/testResults/{testResultId} {
+      allow get, list: if isOwner(userId);
+      allow create: if isOwner(userId) && request.resource.data.userId == userId;
+      allow update: if isExistingOwner(userId) && request.resource.data.userId == resource.data.userId;
+      allow delete: if isExistingOwner(userId);
+    }
+
+    /**
+     * @description Stores tests that have been assigned to a user.
+     * @path /users/{userId}/assignedTests/{assignedTestId}
+     * @allow (get, list) A user can read the tests that have been assigned to them.
+     * @deny (create, update, delete) A user cannot create, modify, or delete their own assignments.
+     * @principle Provides read-only access to user-specific data that is managed by an external authority (e.g., an admin).
+     */
+    match /users/{userId}/assignedTests/{assignedTestId} {
+      allow get, list: if isOwner(userId);
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
+    }
+
+    /**
+     * @description Stores the result for a single question within a test.
+     * @path /testResults/{testResultId}/questionResults/{questionResultId}
+     * @allow (get) A user can get their own question result by checking ownership of the parent test result.
+     * @deny (list) Listing is disallowed because security rules for list operations cannot perform `get` calls to verify parent ownership.
+     * @principle Secures a subcollection by looking up ownership data on its parent document.
+     */
+    match /testResults/{testResultId}/questionResults/{questionResultId} {
+      allow get: if isParentTestResultOwner(testResultId);
+      allow list: if false;
+      allow create: if isParentTestResultOwner(testResultId) && request.resource.data.testResultId == testResultId;
+      allow update: if resource != null && isParentTestResultOwner(testResultId) && request.resource.data.testResultId == resource.data.testResultId;
+      allow delete: if resource != null && isParentTestResultOwner(testResultId);
+    }
+  }
+}

@@ -1,0 +1,348 @@
+{
+  "entities": {
+    "User": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "User",
+      "type": "object",
+      "description": "Represents a user of the CodePrep Pro application.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the user."
+        },
+        "email": {
+          "type": "string",
+          "description": "User's email address.",
+          "format": "email"
+        },
+        "name": {
+          "type": "string",
+          "description": "User's full name."
+        }
+      },
+      "required": [
+        "id",
+        "email",
+        "name"
+      ]
+    },
+    "Quiz": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Quiz",
+      "type": "object",
+      "description": "Represents a quiz consisting of multiple questions.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the quiz."
+        },
+        "title": {
+          "type": "string",
+          "description": "Title of the quiz."
+        },
+        "description": {
+          "type": "string",
+          "description": "Description of the quiz."
+        },
+        "questionIds": {
+          "type": "array",
+          "description": "References to Questions. (Relationship: Quiz 1:N Question)",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "description",
+        "questionIds"
+      ]
+    },
+    "Question": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Question",
+      "type": "object",
+      "description": "Represents a single question in a quiz.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the question."
+        },
+        "type": {
+          "type": "string",
+          "description": "Type of question (e.g., 'multiple choice', 'coding')."
+        },
+        "text": {
+          "type": "string",
+          "description": "Text of the question."
+        },
+        "options": {
+          "type": "array",
+          "description": "Options for multiple-choice questions.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "correctAnswer": {
+          "type": "string",
+          "description": "The correct answer for multiple choice questions."
+        },
+        "codingLanguage": {
+          "type": "string",
+          "description": "Programming language for coding questions (e.g., 'java')."
+        },
+        "testCases": {
+          "type": "array",
+          "description": "Test cases for coding questions.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "mark": {
+          "type": "number",
+          "description": "Mark awarded for correct answer."
+        }
+      },
+      "required": [
+        "id",
+        "type",
+        "text",
+        "mark"
+      ]
+    },
+    "TestResult": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "TestResult",
+      "type": "object",
+      "description": "Represents the result of a user taking a quiz.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the test result."
+        },
+        "userId": {
+          "type": "string",
+          "description": "Reference to User. (Relationship: User 1:N TestResult)"
+        },
+        "quizId": {
+          "type": "string",
+          "description": "Reference to Quiz. (Relationship: Quiz 1:N TestResult)"
+        },
+        "score": {
+          "type": "number",
+          "description": "The score obtained by the user on the quiz."
+        },
+        "submissionDate": {
+          "type": "string",
+          "description": "The date and time when the quiz was submitted.",
+          "format": "date-time"
+        },
+        "questionResults": {
+          "type": "array",
+          "description": "References to QuestionResult. (Relationship: TestResult 1:N QuestionResult)",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "userId",
+        "quizId",
+        "score",
+        "submissionDate",
+        "questionResults"
+      ]
+    },
+    "AssignedTest": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "AssignedTest",
+      "type": "object",
+      "description": "Represents a test assigned to a user by an administrator.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the assigned test."
+        },
+        "userId": {
+          "type": "string",
+          "description": "Reference to User. (Relationship: User 1:N AssignedTest)"
+        },
+        "quizId": {
+          "type": "string",
+          "description": "Reference to Quiz. (Relationship: Quiz 1:N AssignedTest)"
+        },
+        "assignedDate": {
+          "type": "string",
+          "description": "The date when the test was assigned.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "userId",
+        "quizId",
+        "assignedDate"
+      ]
+    },
+    "QuestionResult": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "QuestionResult",
+      "type": "object",
+      "description": "Represents the result of a single question in a test.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the question result."
+        },
+        "questionId": {
+          "type": "string",
+          "description": "Reference to Question. (Relationship: Question 1:N QuestionResult)"
+        },
+        "testResultId": {
+          "type": "string",
+          "description": "Reference to TestResult. (Relationship: TestResult 1:N QuestionResult)"
+        },
+        "isCorrect": {
+          "type": "boolean",
+          "description": "Indicates whether the user answered the question correctly."
+        },
+        "userAnswer": {
+          "type": "string",
+          "description": "The answer provided by the user."
+        },
+        "scoreAwarded": {
+          "type": "number",
+          "description": "Score awarded to the user for this question."
+        }
+      },
+      "required": [
+        "id",
+        "questionId",
+        "testResultId",
+        "isCorrect",
+        "scoreAwarded"
+      ]
+    }
+  },
+  "auth": {
+    "providers": [
+      "password",
+      "anonymous"
+    ]
+  },
+  "firestore": {
+    "structure": [
+      {
+        "path": "/users/{userId}",
+        "definition": {
+          "entityName": "User",
+          "schema": {
+            "$ref": "#/backend/entities/User"
+          },
+          "description": "Stores user profiles. Path-based ownership for user-specific data.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier for the user."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/quizzes/{quizId}",
+        "definition": {
+          "entityName": "Quiz",
+          "schema": {
+            "$ref": "#/backend/entities/Quiz"
+          },
+          "description": "Stores quiz definitions, including title, description, and references to questions.",
+          "params": [
+            {
+              "name": "quizId",
+              "description": "The unique identifier for the quiz."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/questions/{questionId}",
+        "definition": {
+          "entityName": "Question",
+          "schema": {
+            "$ref": "#/backend/entities/Question"
+          },
+          "description": "Stores question details, including type, text, options, and correct answer or test cases.",
+          "params": [
+            {
+              "name": "questionId",
+              "description": "The unique identifier for the question."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/testResults/{testResultId}",
+        "definition": {
+          "entityName": "TestResult",
+          "schema": {
+            "$ref": "#/backend/entities/TestResult"
+          },
+          "description": "Stores test results for each user, including score, submission date, and references to question results. Path-based ownership.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier for the user."
+            },
+            {
+              "name": "testResultId",
+              "description": "The unique identifier for the test result."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/assignedTests/{assignedTestId}",
+        "definition": {
+          "entityName": "AssignedTest",
+          "schema": {
+            "$ref": "#/backend/entities/AssignedTest"
+          },
+          "description": "Stores assigned tests for each user. Path-based ownership.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier for the user."
+            },
+            {
+              "name": "assignedTestId",
+              "description": "The unique identifier for the assigned test."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/testResults/{testResultId}/questionResults/{questionResultId}",
+        "definition": {
+          "entityName": "QuestionResult",
+          "schema": {
+            "$ref": "#/backend/entities/QuestionResult"
+          },
+          "description": "Stores question results for each test, including whether the user answered correctly and the score awarded.",
+          "params": [
+            {
+              "name": "testResultId",
+              "description": "The unique identifier for the test result."
+            },
+            {
+              "name": "questionResultId",
+              "description": "The unique identifier for the question result."
+            }
+          ]
+        }
+      }
+    ],
+    "reasoning": "The Firestore structure is designed to support the CodePrep Pro application's requirements for managing users, quizzes, questions, and test results.  The structure emphasizes Authorization Independence and facilitates secure list operations by avoiding hierarchical dependencies. User-owned data is organized under the `/users/{userId}` path. Collaborative quiz and question data is segregated. The structure supports efficient querying for quizzes, questions, and test results, while ensuring data integrity and security.\n\nSpecifically, Authorization Independence is achieved through path-based ownership for private user data (e.g., `/users/{userId}/testResults/{testResultId}`).  This structure avoids `get()` calls in security rules to check parent document properties.\n\nThe `AssignedTests` collection allows admins to assign tests to individual users, using a dedicated path to enable DBAC (Database-Based Access Control) since no custom claims are used. The TestResults and QuestionResults document reference Quiz and Question using IDs, the actual document content is never duplicated, because the cost of read is less expensive than the cost of write.\n\nFor QAPs, the structure employs Structural Segregation: User-specific data (test results, assigned tests) resides under `/users/{userId}`, while global quiz and question data are in separate collections. This ensures that listing quizzes or questions does not require complex filtering based on user roles or ownership.\n\nThe explicit state modeling uses the `isCorrect` field in `QuestionResult` to track question status.\n"
+  }
+}
