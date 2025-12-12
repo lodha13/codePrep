@@ -25,25 +25,16 @@ export default function CodingView({ question, onCodeChange, currentCode }: Codi
 
     const handleRun = async () => {
         setExecuting(true);
-        setExecutionResult(null); // Clear previous results
+        setExecutionResult(null);
         setActiveTab("output");
-
         try {
-            // Only run against VISIBLE test cases
             const visibleTestCases = question.testCases.filter(tc => !tc.isHidden);
             const result = await executeCode(currentCode, question.language, visibleTestCases);
             setExecutionResult(result);
-        } catch (err: any) {
-            // This catch block is for network errors or unexpected issues with the executeCode function itself.
-            setExecutionResult({
-                stderr: `An application error occurred while trying to run the code: ${err.message}`,
-                status: { id: -1, description: "Application Error" }, // Custom status for app error
-                time: "0",
-                memory: 0,
-                compile_output: null,
-                message: "Application Error",
-                stdout: null,
-            });
+        } catch (err) {
+            // Re-throw the error so Next.js can handle it and display a proper error overlay.
+            // This helps in debugging application-level errors instead of swallowing them.
+            throw err;
         } finally {
             setExecuting(false);
         }
