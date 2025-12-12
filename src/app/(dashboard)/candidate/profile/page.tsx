@@ -18,7 +18,10 @@ export default function ProfilePage() {
 
     useEffect(() => {
         const fetchResults = async () => {
-            if (!user) return;
+            if (!user) {
+                setLoading(false);
+                return;
+            };
 
             setLoading(true);
             const resultsQuery = query(collection(db, 'results'), where('userId', '==', user.uid));
