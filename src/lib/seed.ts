@@ -27,9 +27,9 @@ const seedDatabase = async () => {
     const batch = writeBatch(db);
 
     // --- Questions Data ---
-    const questions: (MCQQuestion | CodingQuestion)[] = [
+    const questions: (Omit<MCQQuestion, 'id'> | Omit<CodingQuestion, 'id'>)[] = [
         {
-            id: 'jmt_q1',
+            
             title: 'ExecutorService Shutdown Behavior',
             description: 'What happens if you submit a new task to an `ExecutorService` after `shutdown()` has been called? <br/>```java\nExecutorService executor = Executors.newSingleThreadExecutor();\nexecutor.shutdown();\nFuture<String> future = executor.submit(() -> "Task after shutdown");\n```',
             type: 'mcq',
@@ -44,7 +44,7 @@ const seedDatabase = async () => {
             correctOptionIndex: 1,
         },
         {
-            id: 'jmt_q2',
+            
             title: '`volatile` Keyword Guarantee',
             description: 'A shared variable is declared as `volatile`. What does the `volatile` keyword primarily guarantee?<br/>```java\nprivate volatile boolean flag = false;\n\n// Thread A\nflag = true;\n\n// Thread B\nif (flag) {\n  // do something\n}\n```',
             type: 'mcq',
@@ -59,7 +59,7 @@ const seedDatabase = async () => {
             correctOptionIndex: 1,
         },
         {
-            id: 'jmt_q3',
+            
             title: '`ReentrantLock` vs `synchronized`',
             description: 'Which of the following is a feature of `ReentrantLock` that is NOT available with the `synchronized` keyword?',
             type: 'mcq',
@@ -74,7 +74,7 @@ const seedDatabase = async () => {
             correctOptionIndex: 1,
         },
         {
-            id: 'jmt_q4',
+            
             title: '`CompletableFuture` Output',
             description: 'What is the output of the following `CompletableFuture` code?<br/>```java\nCompletableFuture.supplyAsync(() -> "Hello")\n    .thenApplyAsync(s -> s + " World")\n    .thenAccept(System.out::print)\n    .join();\nSystem.out.print(" from Main");\n```',
             type: 'mcq',
@@ -89,7 +89,7 @@ const seedDatabase = async () => {
             correctOptionIndex: 0,
         },
         {
-            id: 'jmt_q5',
+            
             title: '`Thread.join()` Behavior',
             description: 'What is the purpose of `t.join()` in the following code?<br/>```java\nThread t = new Thread(() -> {\n    // some long-running task\n});\nt.start();\nt.join(); // What does this line do?\nSystem.out.println("Main thread finished.");\n```',
             type: 'mcq',
@@ -104,7 +104,7 @@ const seedDatabase = async () => {
             correctOptionIndex: 2,
         },
         {
-            id: 'jmt_q6',
+            
             title: '`ConcurrentHashMap` Atomicity',
             description: 'Which operation is atomic in `ConcurrentHashMap`?<br/>```java\nConcurrentHashMap<String, Integer> map = new ConcurrentHashMap<>();\n```',
             type: 'mcq',
@@ -119,7 +119,7 @@ const seedDatabase = async () => {
             correctOptionIndex: 2,
         },
         {
-            id: 'jmt_q7',
+            
             title: '`CountDownLatch` Usage',
             description: 'What will be printed to the console?<br/>```java\nCountDownLatch latch = new CountDownLatch(2);\nnew Thread(() -> {\n    System.out.print("A");\n    latch.countDown();\n}).start();\nnew Thread(() -> {\n    System.out.print("B");\n    latch.countDown();\n}).start();\nlatch.await();\nSystem.out.print("C");\n```',
             type: 'mcq',
@@ -134,7 +134,7 @@ const seedDatabase = async () => {
             correctOptionIndex: 3,
         },
         {
-            id: 'jmt_q8',
+            
             title: '`Callable` vs `Runnable`',
             description: 'What is the key difference between `Callable` and `Runnable`?',
             type: 'mcq',
@@ -149,7 +149,7 @@ const seedDatabase = async () => {
             correctOptionIndex: 1,
         },
         {
-            id: 'jmt_q9',
+            
             title: '`synchronized` method output',
             description: 'Given two threads calling `increment()` on the same `Counter` instance, what is the final value of `count`?<br/>```java\nclass Counter {\n    private int count = 0;\n    public synchronized void increment() {\n        count++;\n    }\n    public int getCount() { return count; }\n}\n// Two threads call increment() 1000 times each.\n```',
             type: 'mcq',
@@ -164,7 +164,7 @@ const seedDatabase = async () => {
             correctOptionIndex: 1,
         },
         {
-            id: 'jmt_q10',
+            
             title: 'Deadlock Condition',
             description: 'Two threads, T1 and T2, need to acquire locks on two resources, R1 and R2. T1 acquires R1, then R2. T2 acquires R2, then R1. What condition does this scenario describe?',
             type: 'mcq',
@@ -179,7 +179,7 @@ const seedDatabase = async () => {
             correctOptionIndex: 3,
         },
         {
-            id: 'jmt_q11',
+            
             title: '`Future.get()` Behavior',
             description: 'What happens when `future.get()` is called?<br/>```java\nExecutorService executor = Executors.newSingleThreadExecutor();\nFuture<String> future = executor.submit(() -> {\n    Thread.sleep(2000);\n    return "Ready";\n});\nString result = future.get(); // This line\n```',
             type: 'mcq',
@@ -194,7 +194,7 @@ const seedDatabase = async () => {
             correctOptionIndex: 2,
         },
         {
-            id: 'jmt_q12',
+            
             title: '`Semaphore` for Resource Limiting',
             description: 'A `Semaphore` is initialized with `new Semaphore(3)`. How many threads can acquire a permit simultaneously without blocking?',
             type: 'mcq',
@@ -204,7 +204,7 @@ const seedDatabase = async () => {
             correctOptionIndex: 2,
         },
         {
-            id: 'jmt_q13',
+            
             title: '`Executors.newCachedThreadPool()` Behavior',
             description: 'You create an `ExecutorService` using `Executors.newCachedThreadPool()`. You submit 100 tasks to it simultaneously. What is the most likely behavior?',
             type: 'mcq',
@@ -219,7 +219,7 @@ const seedDatabase = async () => {
             correctOptionIndex: 1,
         },
         {
-            id: 'jmt_q14',
+            
             title: '`ThreadLocal` Variable Scope',
             description: 'What is the main characteristic of a `ThreadLocal` variable?<br/>```java\nThreadLocal<Integer> userContext = new ThreadLocal<>();\nuserContext.set(123);\n```',
             type: 'mcq',
@@ -234,7 +234,7 @@ const seedDatabase = async () => {
             correctOptionIndex: 2,
         },
         {
-            id: 'jmt_q15',
+            
             title: 'Daemon Thread Behavior',
             description: 'If all remaining running threads in a Java application are daemon threads, what happens?',
             type: 'mcq',
@@ -249,7 +249,7 @@ const seedDatabase = async () => {
             correctOptionIndex: 2,
         },
         {
-            id: 'jmt_q16',
+            
             title: '`wait()` and `notifyAll()`',
             description: 'A thread calls `wait()` on an object. What must be true for this to work correctly?',
             type: 'mcq',
@@ -264,7 +264,7 @@ const seedDatabase = async () => {
             correctOptionIndex: 1,
         },
         {
-            id: 'jmt_q17',
+            
             title: '`AtomicInteger` Output',
             description: 'Two threads call `increment()` on the same `Counter` instance 1000 times each. What is a possible final value of `count`?<br/>```java\nclass Counter {\n    private AtomicInteger count = new AtomicInteger(0);\n    public void increment() {\n        count.incrementAndGet();\n    }\n    public int getCount() { return count.get(); }\n}\n```',
             type: 'mcq',
@@ -279,7 +279,7 @@ const seedDatabase = async () => {
             correctOptionIndex: 1,
         },
         {
-            id: 'jmt_q18',
+            
             title: '`CyclicBarrier` vs `CountDownLatch`',
             description: 'What is a key difference between `CyclicBarrier` and `CountDownLatch`?',
             type: 'mcq',
@@ -294,7 +294,7 @@ const seedDatabase = async () => {
             correctOptionIndex: 1,
         },
         {
-            id: 'jmt_q19',
+            
             title: '`CompletableFuture.thenCombine`',
             description: 'What is the purpose of `thenCombine` in this example?<br/>```java\nCompletableFuture<String> future1 = ...;\nCompletableFuture<String> future2 = ...;\nCompletableFuture<String> combined = future1.thenCombine(future2, (res1, res2) -> res1 + res2);\n```',
             type: 'mcq',
@@ -309,7 +309,7 @@ const seedDatabase = async () => {
             correctOptionIndex: 2,
         },
         {
-            id: 'jmt_q20',
+            
             title: '`StampedLock` Read-Write Behavior',
             description: 'Why might a read operation using `tryOptimisticRead()` on a `StampedLock` need to be retried with a full read lock?',
             type: 'mcq',
@@ -324,7 +324,7 @@ const seedDatabase = async () => {
             correctOptionIndex: 1,
         },
         {
-            id: 'jmt_q21',
+            
             title: 'Find Prime Numbers with ExecutorService',
             description: 'Complete the `findPrimes` method. It should use an `ExecutorService` to check for primality of numbers in a given range in parallel. The method should return a list of all prime numbers found.',
             type: 'coding',
@@ -363,7 +363,7 @@ class Solution {
             ],
         },
         {
-            id: 'jmt_q22',
+            
             title: '`ForkJoinPool` Summation',
             description: 'What is the likely output of this `ForkJoinPool` code?<br/>```java\nclass Sum extends RecursiveTask<Long> { ... } // Assume correct implementation\n\nForkJoinPool pool = ForkJoinPool.commonPool();\nlong total = pool.invoke(new Sum(array, 0, array.length));\nSystem.out.println(total);\n```',
             type: 'mcq',
@@ -378,7 +378,7 @@ class Solution {
             correctOptionIndex: 0,
         },
         {
-            id: 'jmt_q23',
+            
             title: '`InterruptedException` Handling',
             description: 'A thread is blocked in `Thread.sleep()`. Another thread calls `interrupt()` on it. What happens?',
             type: 'mcq',
@@ -393,7 +393,7 @@ class Solution {
             correctOptionIndex: 1,
         },
         {
-            id: 'jmt_q24',
+            
             title: '`ReadWriteLock` Purpose',
             description: 'When is it most beneficial to use a `ReadWriteLock` over a standard `ReentrantLock`?',
             type: 'mcq',
@@ -408,7 +408,7 @@ class Solution {
             correctOptionIndex: 1,
         },
         {
-            id: 'jmt_q25',
+            
             title: '`BlockingQueue` `put` method',
             description: 'You call the `put()` method on a `BlockingQueue` that is currently full. What is the behavior of the calling thread?',
             type: 'mcq',
@@ -423,7 +423,7 @@ class Solution {
             correctOptionIndex: 2,
         },
         {
-            id: 'jmt_q26',
+            
             title: '`synchronized` block output',
             description: 'What is a possible output of this program?<br/>```java\npublic class Test {\n    public static void main(String[] args) {\n        Object lock = new Object();\n        new Thread(() -> {\n            synchronized(lock) {\n                System.out.print("A");\n                try { lock.wait(); } catch (InterruptedException e) {}\n                System.out.print("B");\n            }\n        }).start();\n        new Thread(() -> {\n            synchronized(lock) {\n                System.out.print("C");\n                lock.notify();\n            }\n        }).start();\n    }\n}\n```',
             type: 'mcq',
@@ -438,7 +438,7 @@ class Solution {
             correctOptionIndex: 0,
         },
         {
-            id: 'jmt_q27',
+            
             title: 'Producer-Consumer with BlockingQueue',
             description: 'Implement the `Producer` and `Consumer` logic using the provided `BlockingQueue`. The `Producer` should add the numbers 1 through 10 to the queue. The `Consumer` should retrieve all 10 numbers and add them to its `consumedItems` list.',
             type: 'coding',
@@ -477,7 +477,7 @@ class Solution {
             ],
         },
         {
-            id: 'jmt_q28',
+            
             title: '`CompletableFuture` Exception Handling',
             description: 'What is printed by the following code?<br/>```java\nCompletableFuture.supplyAsync(() -> {\n    if (true) throw new RuntimeException("Error!");\n    return "Success";\n}).exceptionally(ex -> {\n    System.out.print(ex.getMessage());\n    return "Fallback";\n}).thenAccept(System.out::print);\n```',
             type: 'mcq',
@@ -492,7 +492,7 @@ class Solution {
             correctOptionIndex: 1,
         },
         {
-            id: 'jmt_q29',
+            
             title: 'Thread Pool Saturation Policy',
             description: 'You create a `ThreadPoolExecutor` with a fixed-size pool, a bounded queue, and the default `AbortPolicy`. What happens when the pool, the queue, and the max pool size are all saturated, and a new task is submitted?',
             type: 'mcq',
@@ -507,7 +507,7 @@ class Solution {
             correctOptionIndex: 2,
         },
         {
-            id: 'jmt_q30',
+            
             title: '`volatile` vs `AtomicInteger`',
             description: 'For a simple counter variable `i` that needs to be incremented by multiple threads, why is `AtomicInteger` preferred over a `volatile int`?',
             type: 'mcq',
@@ -523,41 +523,38 @@ class Solution {
         },
     ];
 
-    // --- Quizzes Data ---
-    const allQuestionIds = questions.map(q => q.id);
+    const questionIds = questions.map((_, index) => `jmt_q${index + 1}`);
 
-    const quizzes: Quiz[] = [
-        {
-            id: 'java-multithreading-expert-quiz',
-            title: 'Expert Java Multithreading Assessment',
-            description: 'A comprehensive quiz to test deep, practical knowledge of Java\'s concurrency features, including code analysis and problem-solving.',
-            durationMinutes: 60,
-            category: 'Programming',
-            subCategory: 'Java',
-            type: 'assessment',
-            questionIds: allQuestionIds,
-            createdBy: 'admin_user_id',
-            createdAt: new Date(),
-            isPublic: true,
-        }
-    ];
+    // --- Quizzes Data ---
+    const quiz: Omit<Quiz, 'id'> = {
+        title: 'Expert Java Multithreading Assessment',
+        description: 'A comprehensive quiz to test deep, practical knowledge of Java\'s concurrency features, including code analysis and problem-solving.',
+        durationMinutes: 60,
+        category: 'Programming',
+        type: 'assessment',
+        questionIds: questionIds,
+        createdAt: new Date(),
+        isPublic: true,
+        difficulty: 'hard',
+    };
+    
+    // --- Batch Write ---
+    const quizId = 'java-multithreading-expert-quiz';
 
     // Add questions to batch
     const questionsRef = collection(db, 'questions');
-    questions.forEach((question) => {
-        const questionDoc = doc(questionsRef, question.id);
-        batch.set(questionDoc, question);
+    questions.forEach((questionData, index) => {
+        const questionId = questionIds[index];
+        const questionDoc = doc(questionsRef, questionId);
+        batch.set(questionDoc, questionData);
     });
     console.log(`${questions.length} questions prepared for seeding.`);
 
-
-    // Add quizzes to batch
+    // Add quiz to batch
     const quizzesRef = collection(db, 'quizzes');
-    quizzes.forEach((quiz) => {
-        const quizDoc = doc(quizzesRef, quiz.id);
-        batch.set(quizDoc, quiz);
-    });
-    console.log(`${quizzes.length} quizzes prepared for seeding.`);
+    const quizDoc = doc(quizzesRef, quizId);
+    batch.set(quizDoc, quiz);
+    console.log(`1 quiz prepared for seeding.`);
 
 
     try {
