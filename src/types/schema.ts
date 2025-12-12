@@ -1,3 +1,4 @@
+
 import { Timestamp } from "firebase/firestore";
 
 export type UserRole = "admin" | "candidate";
@@ -9,6 +10,7 @@ export interface User {
     role: UserRole;
     createdAt: Date; // Changed to Date for consistency
     completedQuizIds?: string[];
+    photoURL?: string;
 }
 
 export interface Quiz {
@@ -74,8 +76,8 @@ export interface QuizResult {
     id: string;
     quizId: string;
     userId: string;
-    startedAt: Date;
-    completedAt?: Date;
+    startedAt: Date | Timestamp;
+    completedAt?: Date | Timestamp;
     score: number;
     totalScore: number;
     status: "in-progress" | "completed";
