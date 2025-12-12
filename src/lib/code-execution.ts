@@ -51,6 +51,8 @@ export async function executeCode(
         throw new Error(`Unsupported language: ${language}`);
     }
 
+    const judge0Endpoint = 'https://ce.judge0.com/submissions?base64_encoded=true&wait=true';
+
     try {
         // --- Step 1: Compilation Check ---
         const compileCheckPayload = {
@@ -58,8 +60,6 @@ export async function executeCode(
             language_id: language_id,
         };
         
-        const judge0Endpoint = 'https://api.judge0.com/submissions?base64_encoded=true&wait=true';
-
         const compileResponse = await fetch(judge0Endpoint, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -68,10 +68,11 @@ export async function executeCode(
         
         if (!compileResponse.ok) {
              const errorBody = await compileResponse.json();
+             const errorMessage = errorBody?.message || 'Failed to check compilation.';
              return {
                 stdout: null,
-                stderr: `Judge0 API Error: ${errorBody.message || 'Failed to check compilation.'}`,
-                compile_output: `Judge0 API Error: ${errorBody.message || 'Failed to check compilation.'}`,
+                stderr: `Judge0 API Error: ${errorMessage}`,
+                compile_output: `Judge0 API Error: ${errorMessage}`,
                 message: "API Error",
                 status: { id: 13, description: "Internal Error" },
                 time: "0",
