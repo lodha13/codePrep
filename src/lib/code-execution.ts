@@ -1,19 +1,28 @@
 
+export interface TestCaseResult {
+    input: string;
+    expected: string;
+    actual: string;
+    passed: boolean;
+}
+
 export interface ExecutionResult {
-    stdout: string;
-    stderr: string;
-    compile_output: string;
-    message: string;
+    stdout: string | null;
+    stderr: string | null;
+    compile_output: string | null;
+    message: string | null;
     status: { id: number; description: string };
     time: string;
     memory: number;
-    passed_tests?: number; // Number of tests passed
-    total_tests?: number;  // Total tests run
+    
+    // Detailed results for each test case run
+    test_case_results?: TestCaseResult[];
+    passed_tests?: number;
+    total_tests?: number;
 }
 
-// This is a mock function. In a real application, you would have a secure
-// backend service to execute code against all test cases.
-export async function executeCode(source_code: string, solution_code?: string, testCases: any[] = []): Promise<ExecutionResult> {
+// This mock function simulates running code against a set of test cases.
+export async function executeCode(source_code: string, testCases: any[]): Promise<ExecutionResult> {
 
     // Simulate a delay for a realistic feel
     await new Promise(resolve => setTimeout(resolve, 1000));
@@ -21,9 +30,9 @@ export async function executeCode(source_code: string, solution_code?: string, t
     // Basic validation: Check if the source code is not empty
     if (!source_code || source_code.trim().length < 10) {
         return {
-            stdout: "",
+            stdout: null,
             stderr: "Your code is too short or empty.",
-            compile_output: "",
+            compile_output: null,
             message: "Execution failed.",
             status: { id: 6, description: "Compilation Error" },
             time: "0.1",
@@ -31,36 +40,58 @@ export async function executeCode(source_code: string, solution_code?: string, t
         };
     }
 
-    const total_tests = testCases.length;
+    // A hardcoded, simplistic "solution" for the mock Two Sum problem.
+    // This is just to have something to compare against for simulation purposes.
+    const isCorrectSolution = source_code.includes("HashMap") && source_code.includes("complement");
 
-    // If a solution code is provided, we can do a simple comparison for simulation
-    if (solution_code && source_code.replace(/\s/g, '') === solution_code.replace(/\s/g, '')) {
+    let passed_tests = 0;
+    const test_case_results: TestCaseResult[] = [];
+
+    for (const tc of testCases) {
+        // In a real scenario, you'd execute the code with tc.input
+        // and compare the result with tc.expectedOutput.
+        // Here, we just simulate it.
+        const passed = isCorrectSolution || (Math.random() > 0.5 && passed_tests < testCases.length -1) ; // Randomly pass some if not perfect
+        
+        if (passed) {
+            passed_tests++;
+        }
+        
+        test_case_results.push({
+            input: tc.input,
+            expected: tc.expectedOutput,
+            actual: passed ? tc.expectedOutput : '[-1, -1]', // Simulate wrong output
+            passed: passed,
+        });
+    }
+
+    const all_passed = passed_tests === testCases.length;
+
+    if (all_passed) {
          return {
-            stdout: `All ${total_tests} test cases passed!`,
-            stderr: "",
-            compile_output: "",
-            message: "Execution successful.",
+            stdout: "All test cases passed!",
+            stderr: null,
+            compile_output: null,
+            message: "Accepted",
             status: { id: 3, description: "Accepted" },
             time: "0.2",
             memory: 15000,
-            passed_tests: total_tests,
-            total_tests: total_tests,
+            passed_tests: passed_tests,
+            total_tests: testCases.length,
+            test_case_results: test_case_results,
         };
     }
 
-    // Simulate partial success for other cases. Let's say it passes 1 of the visible tests.
-    const passed_tests = Math.min(1, testCases.filter(tc => !tc.isHidden).length); 
-    const first_failed_case = testCases.find(tc => !tc.isHidden) || testCases[0];
-
     return {
-        stdout: `Input: ${first_failed_case?.input ?? 'N/A'}\nExpected: ${first_failed_case?.expectedOutput ?? 'N/A'}\nGot: []`,
-        stderr: "",
-        compile_output: "",
+        stdout: null,
+        stderr: "One or more test cases failed.",
+        compile_output: null,
         message: "Wrong Answer",
         status: { id: 4, description: "Wrong Answer" },
         time: "0.2",
         memory: 15000,
         passed_tests: passed_tests,
-        total_tests: total_tests,
+        total_tests: testCases.length,
+        test_case_results: test_case_results,
     };
 }

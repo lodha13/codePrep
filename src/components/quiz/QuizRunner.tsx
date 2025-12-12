@@ -75,9 +75,11 @@ export default function QuizRunner({ quiz, questions }: QuizRunnerProps) {
                 }
             } else if (q.type === 'coding') {
                 const codingQ = q as CodingQuestion;
-                questionMaxScore = codingQ.testCases.length;
-                const executionResult = await executeCode(userAnswer, codingQ.solutionCode, codingQ.testCases);
+                // On final submit, run against ALL test cases
+                const executionResult = await executeCode(userAnswer || "", codingQ.testCases);
+                
                 questionScore = executionResult.passed_tests || 0;
+                questionMaxScore = executionResult.total_tests || codingQ.testCases.length;
                 
                 if (questionScore === questionMaxScore) {
                     status = 'correct';
@@ -109,7 +111,7 @@ export default function QuizRunner({ quiz, questions }: QuizRunnerProps) {
 
         if (answeredQuestionsCount < totalQuestionsCount) {
             const confirmed = window.confirm(
-                `You have only answered ${answeredQuestions_count} out of ${totalQuestionsCount} questions. Are you sure you want to submit?`
+                `You have only answered ${answeredQuestionsCount} out of ${totalQuestionsCount} questions. Are you sure you want to submit?`
             );
             if (!confirmed) {
                 return; // Abort submission
@@ -193,9 +195,9 @@ export default function QuizRunner({ quiz, questions }: QuizRunnerProps) {
                     </div>
                 </div>
                  <div className="p-4 border-t">
-                    <p className="text-xs text-center text-muted-foreground">
-                        Navigate using the buttons below or submit on the final question.
-                    </p>
+                    <Button onClick={handleSubmit} disabled={submitting} className="w-full">
+                        {submitting ? "Submitting..." : "Submit Quiz"}
+                    </Button>
                 </div>
             </div>
             <main className="flex-1 flex flex-col">
@@ -223,7 +225,7 @@ export default function QuizRunner({ quiz, questions }: QuizRunnerProps) {
                         <Flag className={cn("h-4 w-4", flagged[currentQuestion.id] && "text-yellow-500 fill-yellow-400")} />
                     </Button>
                     <Button onClick={handleNavigation} disabled={submitting}>
-                        {submitting ? "Submitting..." : (isLastQuestion ? 'Submit' : 'Next')}
+                        {isLastQuestion ? 'Finish & Submit' : 'Save & Next'}
                          {!isLastQuestion && <ChevronRight className="h-4 w-4 ml-1"/>}
                     </Button>
                 </div>

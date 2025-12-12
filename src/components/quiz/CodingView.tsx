@@ -1,14 +1,16 @@
+
 "use client";
 
 import Editor from "@monaco-editor/react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { CodingQuestion } from "@/types/schema";
-import { executeCode } from "@/lib/code-execution";
+import { executeCode, ExecutionResult, TestCaseResult } from "@/lib/code-execution";
 import { Card, CardContent } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
+import { CheckCircle, XCircle } from "lucide-react";
 
 interface CodingViewProps {
     question: CodingQuestion;
@@ -17,23 +19,73 @@ interface CodingViewProps {
 }
 
 export default function CodingView({ question, onCodeChange, currentCode }: CodingViewProps) {
-    const [output, setOutput] = useState("");
+    const [executionResult, setExecutionResult] = useState<ExecutionResult | null>(null);
     const [executing, setExecuting] = useState(false);
-    const [activeTab, setActiveTab] = useState("output");
+    const [activeTab, setActiveTab] = useState("testcases");
 
     const handleRun = async () => {
         setExecuting(true);
+        setExecutionResult(null); // Clear previous results
         setActiveTab("output");
+        
         try {
-            const result = await executeCode(currentCode, question.solutionCode);
-            let out = result.stdout || result.stderr || result.compile_output || result.message;
-            setOutput(out);
+            // Only run against VISIBLE test cases
+            const visibleTestCases = question.testCases.filter(tc => !tc.isHidden);
+            const result = await executeCode(currentCode, visibleTestCases);
+            setExecutionResult(result);
         } catch (err) {
-            setOutput("Error executing code.");
+            setExecutionResult({
+                 stderr: "Error executing code.",
+                 status: { id: 11, description: "Execution Error" },
+                 time: "0",
+                 memory: 0,
+                 compile_output: null,
+                 message: null,
+                 stdout: null,
+            });
         } finally {
             setExecuting(false);
         }
     };
+    
+    const renderOutput = () => {
+        if (executing) {
+            return "Executing...";
+        }
+        if (!executionResult) {
+            return "Run code to see output...";
+        }
+        if (executionResult.stderr) {
+            return <span className="text-red-500">{executionResult.stderr}</span>;
+        }
+         if (executionResult.compile_output) {
+            return <span className="text-red-500">{executionResult.compile_output}</span>;
+        }
+        if (!executionResult.test_case_results) {
+            return "No test case results available.";
+        }
+
+        return (
+            <div className="space-y-4">
+                {executionResult.test_case_results.map((res, i) => (
+                    <div key={i}>
+                        <div className="flex items-center gap-2 mb-2">
+                            {res.passed ? <CheckCircle className="h-5 w-5 text-green-500"/> : <XCircle className="h-5 w-5 text-red-500"/>}
+                            <h4 className="font-semibold text-white">Test Case {i + 1}</h4>
+                            <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${res.passed ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
+                                {res.passed ? 'Passed' : 'Failed'}
+                            </span>
+                        </div>
+                        <Card className="bg-gray-800 border-gray-700 text-gray-300 font-mono text-sm p-3">
+                            <p><span className="font-semibold text-gray-400">Input:</span> {res.input}</p>
+                            <p><span className="font-semibold text-gray-400">Expected:</span> {res.expected}</p>
+                            <p><span className="font-semibold text-gray-400">Your Output:</span> {res.actual}</p>
+                        </Card>
+                    </div>
+                ))}
+            </div>
+        )
+    }
 
     return (
         <div className="flex h-full flex-col lg:flex-row">
@@ -79,11 +131,11 @@ export default function CodingView({ question, onCodeChange, currentCode }: Codi
                                     ))}
                                </ScrollArea>
                             </TabsContent>
-                             <TabsContent value="output" className="flex-grow p-2 bg-gray-900 text-white mt-0">
+                             <TabsContent value="output" className="flex-grow p-4 bg-gray-900 text-white mt-0">
                                <ScrollArea className="h-full">
-                                    <pre className="text-sm font-mono whitespace-pre-wrap">
-                                        {executing ? "Executing..." : (output || "Run code to see output...")}
-                                    </pre>
+                                    <div className="text-sm font-mono whitespace-pre-wrap">
+                                        {renderOutput()}
+                                    </div>
                                </ScrollArea>
                             </TabsContent>
                         </Tabs>
