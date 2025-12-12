@@ -76,7 +76,7 @@ export default function ProfilePage() {
                                         </div>
                                          <div className="flex items-center gap-1.5">
                                             <Calendar className="h-4 w-4" />
-                                            <span>Completed on {(result.completedAt as any)?.toDate().toLocaleDateString()}</span>
+                                            <span>Completed on {(result.completedAt as any)?.toDate().toLocaleString()}</span>
                                         </div>
                                     </div>
                                 </div>
