@@ -1,8 +1,9 @@
 
 'use server';
 
-import { ai } from '@/ai/genkit';
+import { ai as genkitAi } from 'genkit';
 import { z } from 'zod';
+import { ai } from '@/ai/genkit';
 
 // Define Zod schemas that match our Firestore types
 const TestCaseSchema = z.object({
@@ -54,7 +55,7 @@ const QuizGenerationOutputSchema = z.object({
 export type QuizGenerationOutput = z.infer<typeof QuizGenerationOutputSchema>;
 
 
-const prompt = ai.definePrompt({
+const prompt = genkitAi.definePrompt({
   name: 'quizGenerationPrompt',
   input: { schema: QuizGenerationInputSchema },
   output: { schema: QuizGenerationOutputSchema },
@@ -80,18 +81,25 @@ const prompt = ai.definePrompt({
 });
 
 
-const quizGenerationFlow = ai.defineFlow(
+const quizGenerationFlow = genkitAi.defineFlow(
   {
     name: 'quizGenerationFlow',
     inputSchema: QuizGenerationInputSchema,
     outputSchema: QuizGenerationOutputSchema,
   },
   async (input) => {
-    const { output } = await prompt(input);
+    const llmResponse = await ai.generate({
+        prompt: {
+            ...prompt,
+            input: input,
+        }
+    });
+
+    const output = llmResponse.output();
     if (!output) {
       throw new Error('AI failed to generate quiz. The response was empty.');
     }
-    return output;
+    return output as QuizGenerationOutput;
   }
 );
 
