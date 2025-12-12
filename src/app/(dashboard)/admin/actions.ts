@@ -1,15 +1,21 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { collection, getDocs, doc, updateDoc, arrayUnion } from 'firebase/firestore';
+import { collection, getDocs, doc, updateDoc, arrayUnion, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { User, UserRole, Quiz } from '@/types/schema';
 import { cache } from 'react';
 
 export const getUsers = cache(async (): Promise<User[]> => {
     const usersSnapshot = await getDocs(collection(db, "users"));
-    const usersList = usersSnapshot.docs.map(d => d.data() as User);
-    // Filter for candidates only for assignment purposes
+    // Convert Firestore Timestamps to JS Date objects
+    const usersList = usersSnapshot.docs.map(d => {
+        const data = d.data();
+        return {
+            ...data,
+            createdAt: (data.createdAt as Timestamp).toDate(),
+        } as User;
+    });
     return usersList;
 });
 
@@ -34,7 +40,15 @@ export async function updateUserRole(uid: string, newRole: UserRole): Promise<{ 
 
 export const getQuizzes = cache(async (): Promise<Quiz[]> => {
     const quizzesSnapshot = await getDocs(collection(db, "quizzes"));
-    const quizzesList = quizzesSnapshot.docs.map(d => ({ id: d.id, ...d.data() } as Quiz));
+    // Convert Firestore Timestamps to JS Date objects
+    const quizzesList = quizzesSnapshot.docs.map(d => {
+        const data = d.data();
+        return {
+            id: d.id,
+            ...data,
+            createdAt: (data.createdAt as Timestamp).toDate(),
+        } as Quiz;
+    });
     return quizzesList;
 });
 
@@ -53,9 +67,9 @@ export async function assignQuizToUsers(quizId: string, userIds: string[]): Prom
         
         await Promise.all(batch);
         
-        // Revalidate the path for the quizzes page if needed, though this action
-        // doesn't directly change what's on the quizzes list itself.
-        // revalidatePath('/admin/quizzes');
+        revalidatePath('/candidate');
+        revalidatePath('/admin/quizzes');
+
 
         return { success: true, message: `Quiz assigned to ${userIds.length} user(s).` };
 
