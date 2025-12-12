@@ -3,6 +3,7 @@
 
 import { z } from 'zod';
 import { ai } from '@/ai/genkit';
+import { googleAI } from '@genkit-ai/google-genai';
 
 // Define Zod schemas that match our Firestore types
 const TestCaseSchema = z.object({
@@ -75,6 +76,7 @@ const prompt = ai.definePrompt({
     7.  The final output MUST be a single JSON object that strictly adheres to the provided output schema. Do not include any text or formatting outside of the JSON object.
     `,
     config: {
+        model: googleAI.model('gemini-1.5-pro-preview'),
         temperature: 0.8, // Increase creativity for more varied questions
     }
 });
