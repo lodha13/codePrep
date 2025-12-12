@@ -22,7 +22,6 @@ export interface ExecutionResult {
     total_tests?: number;
 }
 
-
 // Maps our simple language names to Judge0's language IDs
 // See https://ce.judge0.com/languages
 const LANGUAGE_ID_MAP: Record<CodingQuestion['language'], number> = {
@@ -39,6 +38,7 @@ const LANGUAGE_ID_MAP: Record<CodingQuestion['language'], number> = {
  * Example: "nums = [2, 7, 11, 15], target = 9" -> "2 7 11 15\n9"
  */
 function parseInput(input: string): string {
+    if (!input) return '';
     return input
         .split(',')
         .map(part => part.split('=')[1]?.trim() || '')
@@ -62,124 +62,115 @@ export async function executeCode(
         throw new Error(`Unsupported language: ${language}`);
     }
 
-    const test_case_results: TestCaseResult[] = [];
-    let passed_tests = 0;
-    
-    let totalTime = 0;
-    let totalMemory = 0;
-    
-    // First, check for compilation error separately. This provides a faster feedback loop.
-    const compileCheckPayload = {
-        source_code: Buffer.from(source_code).toString('base64'),
-        language_id: language_id,
-    };
-
     try {
-        const compileResponse = await fetch(`https://judge0-ce.p.rapidapi.com/submissions?base64_encoded=true&wait=true`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                // Using public API, so no key is needed.
-                'X-RapidAPI-Host': 'judge0-ce.p.rapidapi.com',
-                'X-RapidAPI-Key': process.env.NEXT_PUBLIC_RAPIDAPI_KEY!,
-            },
-            body: JSON.stringify(compileCheckPayload),
+        const submissionPayloads = testCases.map(tc => ({
+            source_code: Buffer.from(source_code).toString('base64'),
+            language_id: language_id,
+            stdin: Buffer.from(parseInput(tc.input)).toString('base64'),
+            expected_output: tc.expectedOutput ? Buffer.from(tc.expectedOutput).toString('base64') : undefined,
+        }));
+
+        const responses = await Promise.allSettled(
+            submissionPayloads.map(payload =>
+                fetch(`https://judge0-ce.p.rapidapi.com/submissions?base64_encoded=true&wait=true`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-RapidAPI-Host': 'judge0-ce.p.rapidapi.com',
+                        'X-RapidAPI-Key': process.env.NEXT_PUBLIC_RAPIDAPI_KEY!,
+                    },
+                    body: JSON.stringify(payload),
+                }).then(res => {
+                    if (!res.ok) {
+                        // Handle non-2xx responses as an error for this submission
+                        return res.json().then(errorBody => Promise.reject(errorBody));
+                    }
+                    return res.json();
+                })
+            )
+        );
+
+        const results = responses.map((res, index) => {
+            if (res.status === 'fulfilled') {
+                return res.value;
+            } else {
+                // Handle rejected promises (network errors, non-ok responses)
+                console.error(`Error processing test case ${index}:`, res.reason);
+                return {
+                    status: { id: 13, description: "Internal Error" }, // Judge0's Internal Error status
+                    stderr: `Failed to execute test case ${index + 1}.`,
+                    time: "0",
+                    memory: 0,
+                };
+            }
         });
 
-        const compileResult = await compileResponse.json();
-
-        // If there's a compilation error, return immediately.
-        if (compileResult.status.id === 6) { // 6 is Compilation Error
+        // Check for a compilation error in the first result
+        const firstResult = results[0];
+        if (firstResult?.status?.id === 6) { // 6 is Compilation Error
             return {
                 stdout: null,
                 stderr: null,
-                compile_output: compileResult.compile_output ? Buffer.from(compileResult.compile_output, 'base64').toString('utf-8') : "Compilation Failed",
+                compile_output: firstResult.compile_output ? Buffer.from(firstResult.compile_output, 'base64').toString('utf-8') : "Compilation Failed",
                 message: "Compilation Error",
-                status: compileResult.status,
+                status: firstResult.status,
                 time: "0",
                 memory: 0,
             };
         }
 
-        // If compilation is successful, proceed to run against test cases.
-        for (const tc of testCases) {
-            const submissionPayload = {
-                ...compileCheckPayload,
-                stdin: Buffer.from(parseInput(tc.input)).toString('base64'),
-                expected_output: tc.expectedOutput ? Buffer.from(tc.expectedOutput).toString('base64') : undefined,
-            };
-
-            const runResponse = await fetch(`https://judge0-ce.p.rapidapi.com/submissions?base64_encoded=true&wait=true`, {
-                method: 'POST',
-                 headers: {
-                    'Content-Type': 'application/json',
-                    'X-RapidAPI-Host': 'judge0-ce.p.rapidapi.com',
-                    'X-RapidAPI-Key': process.env.NEXT_PUBLIC_RAPIDAPI_KEY!,
-                },
-                body: JSON.stringify(submissionPayload),
-            });
-
-            const runResult = await runResponse.json();
-
-            totalTime += parseFloat(runResult.time || "0");
-            totalMemory = Math.max(totalMemory, parseFloat(runResult.memory || "0"));
-
-            // Safely access properties and provide fallbacks.
-            const actualOutput = (runResult.stdout ? Buffer.from(runResult.stdout, 'base64').toString('utf-8') : "").trim();
-            const expectedOutput = (tc.expectedOutput || "").trim();
-            
-            // Judge0 status ID 3 means "Accepted".
-            const isPass = runResult.status.id === 3;
-
+        let passed_tests = 0;
+        const test_case_results = results.map((result, i) => {
+            const isPass = result?.status?.id === 3; // 3 = Accepted
             if (isPass) {
                 passed_tests++;
             }
-
-            test_case_results.push({
-                input: tc.input,
-                expected: expectedOutput,
-                actual: actualOutput || (runResult.stderr ? Buffer.from(runResult.stderr, 'base64').toString('utf-8') : "No output"),
-                passed: isPass,
-            });
+            const actualOutput = result?.stdout ? Buffer.from(result.stdout, 'base64').toString('utf-8') : (result?.stderr ? Buffer.from(result.stderr, 'base64').toString('utf-8') : "No output");
             
-            // If a non-compilation error occurs (e.g., runtime error), stop processing further test cases.
-            if (runResult.status.id > 4) { // Statuses > 4 are various runtime errors
-                break;
-            }
+            return {
+                input: testCases[i].input,
+                expected: testCases[i].expectedOutput || "",
+                actual: actualOutput.trim(),
+                passed: isPass,
+            };
+        });
+
+        const totalTime = results.reduce((acc, r) => acc + parseFloat(r?.time || "0"), 0);
+        const maxMemory = results.reduce((acc, r) => Math.max(acc, r?.memory || 0), 0);
+
+        const finalStatus = results.reduce((currentStatus, r) => {
+            // A more severe error status should take precedence.
+            if (!r || !r.status) return { id: 13, description: "Internal Error" };
+            return r.status.id > currentStatus.id ? r.status : currentStatus;
+        }, { id: 3, description: "Accepted" });
+        
+        if (passed_tests < testCases.length && finalStatus.id === 3) {
+            finalStatus.id = 4; // If not all passed but no other error occurred, it's a "Wrong Answer"
+            finalStatus.description = "Wrong Answer";
         }
-
-        const all_passed = passed_tests === testCases.length;
-
-        const finalStatusId = all_passed ? 3 : (test_case_results.find(r => !r.passed)?.passed === false ? 4 : 11);
-         const statusDescriptions: Record<number, string> = {
-            3: 'Accepted',
-            4: 'Wrong Answer',
-            11: 'Runtime Error (NZEC)'
-            // Add other status descriptions as needed
-        };
 
 
         return {
-            stdout: all_passed ? "All test cases passed!" : null,
-            stderr: all_passed ? null : "One or more test cases failed.",
+            stdout: null,
+            stderr: null,
             compile_output: null,
-            message: statusDescriptions[finalStatusId] || "Error",
-            status: { id: finalStatusId, description: statusDescriptions[finalStatusId] || "Error" },
+            message: finalStatus.description,
+            status: finalStatus,
             time: totalTime.toFixed(3),
-            memory: totalMemory,
+            memory: maxMemory,
             passed_tests: passed_tests,
             total_tests: testCases.length,
             test_case_results: test_case_results,
         };
 
     } catch (error: any) {
-        console.error("Error executing code via Judge0:", error);
+        console.error("Fatal error in executeCode:", error);
         return {
             stdout: null,
-            stderr: `An unexpected error occurred: ${error.message}`,
+            stderr: `An unexpected application error occurred: ${error.message}`,
             compile_output: null,
-            message: "Internal Execution Error",
-            status: { id: 13, description: "Internal Error" }, // Judge0's internal error status
+            message: "Internal Application Error",
+            status: { id: 13, description: "Internal Error" },
             time: "0",
             memory: 0,
         };
