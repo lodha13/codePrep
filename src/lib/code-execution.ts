@@ -1,3 +1,4 @@
+
 import { CodingQuestion, TestCase } from "@/types/schema";
 import { Buffer } from "buffer";
 
@@ -28,6 +29,9 @@ const LANGUAGE_ID_MAP: Record<CodingQuestion["language"], number> = {
   cpp: 54,
 };
 
+const judge0Endpoint = 'https://ce.judge0.com/submissions?base64_encoded=true&wait=true';
+
+
 const decode = (str: string | undefined | null): string => {
   if (!str) return "";
   try {
@@ -45,14 +49,13 @@ export async function executeCode(
   const language_id = LANGUAGE_ID_MAP[language];
   if (!language_id) throw new Error(`Unsupported language: ${language}`);
 
-  const judge0Endpoint = 'https://ce.judge0.com/submissions?base64_encoded=true&wait=true';
   const encodedSource = Buffer.from(source_code).toString("base64");
-  
+
   try {
     // -----------------------------------------------------
     // 1️⃣ COMPILATION CHECK
     // -----------------------------------------------------
-    const compilePayload = {
+    const compilePayload: any = {
       language_id,
       source_code: encodedSource,
     };
@@ -63,9 +66,22 @@ export async function executeCode(
       body: JSON.stringify(compilePayload),
     });
 
+    if (!compileRes.ok) {
+         const errorText = await compileRes.text();
+         return {
+            stdout: null,
+            stderr: `Judge0 API Error: ${errorText}`,
+            compile_output: `Judge0 API Error: ${errorText}`,
+            message: "Judge0 API Error",
+            status: { id: 13, description: "Internal Error" },
+            time: "0",
+            memory: 0,
+        };
+    }
+
     const compileResult = await compileRes.json();
     
-    // Status 6 = Compilation Error
+    // 6 = Compilation Error
     if (compileResult.status?.id === 6) {
       return {
         stdout: null,
@@ -77,19 +93,7 @@ export async function executeCode(
         memory: 0,
       };
     }
-    
-    // Other non-accepted status during initial check (e.g., runtime error without input)
-    if (compileResult.status?.id > 3) {
-       return {
-        stdout: decode(compileResult.stdout),
-        stderr: decode(compileResult.stderr),
-        compile_output: decode(compileResult.compile_output),
-        message: compileResult.status?.description || "Error",
-        status: compileResult.status,
-        time: compileResult.time || "0",
-        memory: compileResult.memory || 0,
-      };
-    }
+
 
     // -----------------------------------------------------
     // 2️⃣ RUN TEST CASES
@@ -97,14 +101,16 @@ export async function executeCode(
     const submissions = testCases.map((tc) => ({
       language_id,
       source_code: encodedSource,
+
       stdin: tc.input
         ? Buffer.from(tc.input).toString("base64")
         : undefined,
+
       expected_output: tc.expectedOutput
         ? Buffer.from(tc.expectedOutput).toString("base64")
         : undefined,
     }));
-    
+
     const results = await Promise.allSettled(
       submissions.map((payload) =>
         fetch(judge0Endpoint, {
@@ -123,51 +129,51 @@ export async function executeCode(
     const test_case_results: TestCaseResult[] = results.map(
       (res: any, index: number) => {
         const tc = testCases[index];
-        const defaultExpected = tc.expectedOutput || "";
-        
+
         if (res.status !== "fulfilled" || !res.value) {
           return {
-            input: tc.input,
-            expected: defaultExpected,
-            actual: "Execution failed due to a network or API error.",
+            input: tc.input || "",
+            expected: tc.expectedOutput || "",
+            actual: `Failed to execute test case ${index + 1}.`,
             passed: false,
           };
         }
 
         const data = res.value;
-        const isPass = data.status?.id === 3;
+        const isPass = data.status?.id === 3; // 3 = Accepted
 
         if (isPass) passed_tests++;
         
-        const actual_output = isPass
-            ? decode(data.stdout)
-            : `${data.status?.description || "Error"}\n${decode(data.stderr) || ''}\n${decode(data.compile_output) || ''}`;
+        // If status is "Wrong Answer" (4), the output is in stdout. For other errors, it might be in stderr.
+        const actual_output = (data.status?.id === 3 || data.status?.id === 4)
+             ? decode(data.stdout)
+             : `${data.status?.description || 'Error'}\n${decode(data.stderr) || ''}\n${decode(data.compile_output) || ''}`.trim();
 
         return {
           input: tc.input,
-          expected: defaultExpected,
+          expected: tc.expectedOutput || "",
           actual: actual_output.trim(),
           passed: isPass,
         };
       }
     );
 
-    const totalTime = results.reduce((acc, r) => {
+    const totalTime = results.reduce((acc: number, r: any) => {
         if (r.status === 'fulfilled' && r.value?.time) {
             return acc + parseFloat(r.value.time);
         }
         return acc;
     }, 0);
 
-    const maxMemory = results.reduce((acc, r) => {
+    const maxMemory = results.reduce((acc: number, r: any) => {
         if (r.status === 'fulfilled' && r.value?.memory) {
             return Math.max(acc, r.value.memory);
         }
         return acc;
     }, 0);
-    
+
     const finalStatus =
-      passed_tests === testCases.length && testCases.length > 0
+      passed_tests === testCases.length
         ? { id: 3, description: "Accepted" }
         : { id: 4, description: "Wrong Answer" };
 
@@ -189,7 +195,7 @@ export async function executeCode(
       stderr: error.message,
       compile_output: null,
       message: "Internal Application Error",
-      status: { id: 13, description: "Internal Error" }, // Judge0 internal error id
+      status: { id: 13, description: "Internal Error" },
       time: "0",
       memory: 0,
     };
