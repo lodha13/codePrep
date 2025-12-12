@@ -58,7 +58,7 @@ export async function executeCode(
             language_id: language_id,
         };
         
-        const judge0Endpoint = 'https://ce.judge0.com/submissions?base64_encoded=true&wait=true';
+        const judge0Endpoint = 'https://api.judge0.com/submissions?base64_encoded=true&wait=true';
 
         const compileResponse = await fetch(judge0Endpoint, {
             method: 'POST',
