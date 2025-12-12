@@ -72,7 +72,7 @@ export default function QuizRunner({ quiz, questions }: QuizRunnerProps) {
                 timeTakenSeconds: 0,
                 status: isCorrect ? 'correct' : 'incorrect',
                 score: isCorrect ? 10 : 0,
-                userAnswer: ans,
+                userAnswer: ans || "", // Fix: Default to empty string if undefined
             };
         });
         return { score, results };
