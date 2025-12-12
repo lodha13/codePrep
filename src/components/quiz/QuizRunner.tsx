@@ -60,17 +60,19 @@ export default function QuizRunner({ quiz, questions }: QuizRunnerProps) {
 
             if (q.type === 'mcq') {
                 isCorrect = ans === q.correctOptionIndex.toString();
-            } else if (q.type === 'coding') {
-                isCorrect = !!ans && ans.length > 10;
+            } else if (q.type === 'coding' && q.solutionCode) {
+                 // Simple check: compare submitted code to solution, ignoring whitespace.
+                 // This replaces the external API call.
+                isCorrect = !!ans && ans.replace(/\s/g, '') === q.solutionCode.replace(/\s/g, '');
             }
 
-            if (isCorrect) score += 1;
+            if (isCorrect) score += 10; // Award 10 points per correct question
 
             results[q.id] = {
                 questionId: q.id,
                 timeTakenSeconds: 0,
                 status: isCorrect ? 'correct' : 'incorrect',
-                score: isCorrect ? 1 : 0,
+                score: isCorrect ? 10 : 0,
                 userAnswer: ans,
             };
         });
@@ -91,7 +93,7 @@ export default function QuizRunner({ quiz, questions }: QuizRunnerProps) {
             startedAt: Timestamp.now(),
             completedAt: Timestamp.now(),
             score,
-            totalScore: questions.length,
+            totalScore: questions.length * 10,
             status: "completed",
             answers: results,
         };
@@ -100,93 +102,82 @@ export default function QuizRunner({ quiz, questions }: QuizRunnerProps) {
         router.push(`/results/${resultId}`);
     };
 
+    if (!currentQuestion) {
+        return <div className="p-8 text-center">Loading questions...</div>;
+    }
+
     return (
-        <div className="flex gap-6 max-w-7xl mx-auto p-6">
-            <div className="w-3/4">
-                <div className="flex justify-between items-center mb-4">
-                    <div>
-                        <h1 className="text-2xl font-bold">{quiz.title}</h1>
-                        <p className="text-gray-500">Question {currentIndex + 1} of {questions.length}</p>
+        <div className="flex h-screen bg-white">
+            <div className="w-1/4 max-w-[280px] border-r flex flex-col">
+                 <div className="p-4 border-b">
+                    <h3 className="font-bold text-lg">{quiz.title}</h3>
+                    <p className="text-sm text-gray-500">Time remaining: 60:00</p>
+                </div>
+                <div className="flex-1 p-4 overflow-y-auto">
+                    <h3 className="font-bold text-sm mb-3">Questions ({questions.length})</h3>
+                    <div className="grid grid-cols-4 gap-2">
+                        {questions.map((q, index) => {
+                            const isAnswered = answers[q.id] !== undefined;
+                            const isFlagged = flagged[q.id];
+                            const isCurrent = index === currentIndex;
+
+                            return (
+                                <button
+                                    key={q.id}
+                                    onClick={() => handleQuestionJump(index)}
+                                    className={cn(
+                                        "h-9 w-9 flex items-center justify-center rounded border transition-colors text-sm",
+                                        isCurrent ? "ring-2 ring-primary ring-offset-2" : "",
+                                        isFlagged ? "bg-yellow-100 border-yellow-400" : "bg-white",
+                                        isAnswered && !isFlagged ? "bg-green-100 border-green-400" : "",
+                                        !isAnswered && !isFlagged ? "hover:bg-gray-100" : ""
+                                    )}
+                                >
+                                    {index + 1}
+                                </button>
+                            );
+                        })}
                     </div>
-                    <div className="text-xl font-mono bg-gray-100 px-3 py-1 rounded">
-                        60:00
+                     <div className="space-y-2 text-xs text-gray-600 pt-6">
+                        <div className="flex items-center gap-2"><div className="h-3 w-3 rounded-sm border bg-white"></div> Not Answered</div>
+                        <div className="flex items-center gap-2"><div className="h-3 w-3 rounded-sm border bg-green-100 border-green-400"></div> Answered</div>
+                        <div className="flex items-center gap-2"><div className="h-3 w-3 rounded-sm border bg-yellow-100 border-yellow-400"></div> Flagged</div>
+                        <div className="flex items-center gap-2"><div className="h-3 w-3 rounded-sm border ring-1 ring-primary"></div> Current</div>
                     </div>
                 </div>
-
-                <Card className="min-h-[600px] flex flex-col">
-                    <CardHeader className="flex flex-row justify-between items-start">
-                        <div>
-                            <CardTitle className="text-lg">{currentQuestion.title}</CardTitle>
-                            <div className="text-gray-600 prose" dangerouslySetInnerHTML={{ __html: currentQuestion.description }} />
-                        </div>
-                        <Button variant="ghost" size="icon" onClick={handleToggleFlag} title="Flag for review">
-                            <Flag className={cn("h-5 w-5", flagged[currentQuestion.id] ? "text-yellow-500 fill-yellow-500" : "text-gray-400")} />
-                        </Button>
-                    </CardHeader>
-
-                    <CardContent className="flex-1">
-                        {currentQuestion.type === 'mcq' ? (
-                            <MCQView
+                 <div className="p-4 border-t">
+                    <Button onClick={handleSubmit} disabled={submitting} className="w-full">
+                        {submitting ? "Submitting..." : "Submit Quiz"}
+                    </Button>
+                </div>
+            </div>
+            <main className="flex-1 flex flex-col">
+                {currentQuestion.type === 'mcq' ? (
+                     <div className="flex flex-col h-full">
+                        <div className="flex-1 p-8 overflow-y-auto">
+                           <MCQView
                                 question={currentQuestion}
                                 selectedOption={answers[currentQuestion.id]}
                                 onSelect={handleAnswer}
                             />
-                        ) : (
-                            <CodingView
-                                question={currentQuestion}
-                                currentCode={answers[currentQuestion.id] || currentQuestion.starterCode}
-                                onCodeChange={handleAnswer}
-                            />
-                        )}
-                    </CardContent>
-                    <CardFooter className="flex justify-between border-t pt-6 bg-gray-50">
-                        <Button variant="outline" onClick={handlePrev} disabled={currentIndex === 0}>
-                            Previous
-                        </Button>
-                        {isLastQuestion ? (
-                            <Button onClick={handleSubmit} disabled={submitting}>
-                                {submitting ? "Submitting..." : "Submit Quiz"}
+                        </div>
+                        <div className="flex justify-between border-t p-4 bg-gray-50">
+                            <Button variant="outline" onClick={handlePrev} disabled={currentIndex === 0}>
+                                Previous
                             </Button>
-                        ) : (
-                            <Button onClick={handleNext}>
+                            <Button onClick={handleNext} disabled={isLastQuestion}>
                                 Next
                             </Button>
-                        )}
-                    </CardFooter>
-                </Card>
-            </div>
-            <div className="w-1/4 space-y-4">
-                <h3 className="font-bold text-lg">Questions</h3>
-                <div className="grid grid-cols-5 gap-2">
-                    {questions.map((q, index) => {
-                        const isAnswered = answers[q.id] !== undefined;
-                        const isFlagged = flagged[q.id];
-                        const isCurrent = index === currentIndex;
-
-                        return (
-                            <button
-                                key={q.id}
-                                onClick={() => handleQuestionJump(index)}
-                                className={cn(
-                                    "h-10 w-10 flex items-center justify-center rounded border transition-colors",
-                                    isCurrent ? "ring-2 ring-blue-500 ring-offset-2" : "",
-                                    isFlagged ? "bg-yellow-100 border-yellow-400" : "bg-white",
-                                    isAnswered && !isFlagged ? "bg-green-100 border-green-400" : "",
-                                    !isAnswered && !isFlagged ? "hover:bg-gray-100" : ""
-                                )}
-                            >
-                                {index + 1}
-                            </button>
-                        );
-                    })}
-                </div>
-                <div className="space-y-2 text-sm text-gray-600 pt-4">
-                    <div className="flex items-center gap-2"><div className="h-4 w-4 rounded border bg-white"></div> Not Answered</div>
-                    <div className="flex items-center gap-2"><div className="h-4 w-4 rounded border bg-green-100 border-green-400"></div> Answered</div>
-                    <div className="flex items-center gap-2"><div className="h-4 w-4 rounded border bg-yellow-100 border-yellow-400"></div> Flagged</div>
-                    <div className="flex items-center gap-2"><div className="h-4 w-4 rounded border ring-2 ring-blue-500"></div> Current</div>
-                </div>
-            </div>
+                        </div>
+                    </div>
+                ) : (
+                    <CodingView
+                        question={currentQuestion}
+                        currentCode={answers[currentQuestion.id] || currentQuestion.starterCode}
+                        onCodeChange={handleAnswer}
+                    />
+                )}
+            </main>
         </div>
     );
 }

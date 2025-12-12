@@ -8,7 +8,7 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription }
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
-import { Book, Clock, LayoutDashboard, LogOut } from "lucide-react";
+import { LogOut, Search, Code, Check, CheckSquare, Square } from "lucide-react";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -18,6 +18,8 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 export default function CandidateDashboard() {
     const [quizzes, setQuizzes] = useState<Quiz[]>([]);
@@ -42,100 +44,137 @@ export default function CandidateDashboard() {
     }
 
     return (
-        <div className="min-h-screen bg-secondary/50 font-body">
-            <header className="sticky top-0 z-30 flex h-14 items-center gap-4 border-b bg-background px-4 sm:static sm:h-auto sm:border-0 sm:bg-transparent sm:px-6 py-4">
-                <h1 className="text-xl font-bold font-headline">Candidate Dashboard</h1>
-                <div className="relative ml-auto flex-1 md:grow-0">
-                    {/* Search can go here */}
+        <div className="min-h-screen bg-background font-body">
+            <header className="sticky top-0 z-30 flex h-16 items-center justify-between gap-4 border-b bg-white px-4 md:px-6">
+                <div className="flex items-center gap-8">
+                     <Link href="/" className="flex items-center gap-2 font-bold text-lg">
+                        <Code className="h-6 w-6 text-primary" />
+                        CodePrep Pro
+                    </Link>
+                    <nav className="hidden md:flex items-center gap-6 text-sm font-medium">
+                        <Link href="#" className="text-foreground transition-colors hover:text-foreground/80">Prepare</Link>
+                        <Link href="#" className="text-muted-foreground transition-colors hover:text-foreground/80">Certify</Link>
+                        <Link href="#" className="text-muted-foreground transition-colors hover:text-foreground/80">Compete</Link>
+                    </nav>
                 </div>
-                <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                        <Button
-                            variant="outline"
-                            size="icon"
-                            className="overflow-hidden rounded-full"
-                        >
-                            <Avatar>
-                                <AvatarImage src={user?.photoURL || ''} alt="Avatar" />
-                                <AvatarFallback>{getInitials(user?.displayName)}</AvatarFallback>
-                            </Avatar>
-                        </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                        <DropdownMenuLabel>{user?.displayName || "My Account"}</DropdownMenuLabel>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem>
-                            <Link href="/profile" className="flex items-center">
-                                <LayoutDashboard className="mr-2 h-4 w-4" /> Profile
-                            </Link>
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem onClick={() => signOut()}>
-                            <LogOut className="mr-2 h-4 w-4" /> Logout
-                        </DropdownMenuItem>
-                    </DropdownMenuContent>
-                </DropdownMenu>
+
+                <div className="flex items-center gap-4">
+                     <div className="relative hidden md:block">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <Input placeholder="Search..." className="pl-9" />
+                    </div>
+                     <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                className="overflow-hidden rounded-full h-9 w-9"
+                            >
+                                <Avatar>
+                                    <AvatarImage src={user?.photoURL || ''} alt="Avatar" />
+                                    <AvatarFallback>{getInitials(user?.displayName)}</AvatarFallback>
+                                </Avatar>
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                            <DropdownMenuLabel>{user?.displayName || "My Account"}</DropdownMenuLabel>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem onClick={() => signOut()}>
+                                <LogOut className="mr-2 h-4 w-4" /> Logout
+                            </DropdownMenuItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+                </div>
             </header>
 
-            <main className="p-8">
+            <main className="p-4 md:p-8 lg:p-12">
                  <div className="mb-8">
-                    <h2 className="text-3xl font-bold font-headline">Welcome, {user?.displayName || "Candidate"}!</h2>
-                    <p className="text-muted-foreground">Here are the assessments available for you.</p>
+                    <p className="text-sm text-muted-foreground">Prepare &gt; Java</p>
+                    <h1 className="text-4xl font-bold font-headline mt-1">Java</h1>
                 </div>
-                
-                {loading ? (
-                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {[...Array(3)].map((_, i) => (
-                             <Card key={i} className="flex flex-col bg-background/50 animate-pulse">
-                                <CardHeader>
-                                    <div className="h-6 w-3/4 bg-muted rounded"></div>
-                                </CardHeader>
-                                <CardContent className="flex-grow space-y-2">
-                                     <div className="h-4 w-full bg-muted rounded"></div>
-                                     <div className="h-4 w-1/2 bg-muted rounded"></div>
-                                </CardContent>
-                                <CardFooter>
-                                    <div className="h-10 w-full bg-muted rounded-md"></div>
-                                </CardFooter>
-                            </Card>
-                        ))}
-                     </div>
-                ) : quizzes.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center text-center py-20 border-2 border-dashed rounded-lg">
-                        <h3 className="text-2xl font-bold font-headline">No Quizzes Available</h3>
-                        <p className="text-muted-foreground mt-2">Please check back later for assigned quizzes.</p>
+
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                    {/* Main Content */}
+                    <div className="lg:col-span-9">
+                        <div className="space-y-4">
+                             {loading ? (
+                                <>
+                                    <Card className="h-24 animate-pulse"></Card>
+                                    <Card className="h-24 animate-pulse"></Card>
+                                    <Card className="h-24 animate-pulse"></Card>
+                                </>
+                            ) : quizzes.length === 0 ? (
+                                <div className="flex flex-col items-center justify-center text-center py-20 border-2 border-dashed rounded-lg">
+                                    <h3 className="text-2xl font-bold font-headline">No Quizzes Available</h3>
+                                    <p className="text-muted-foreground mt-2">Please check back later for assigned quizzes.</p>
+                                </div>
+                            ) : (
+                                quizzes.map(quiz => (
+                                    <Card key={quiz.id} className="hover:shadow-md transition-shadow">
+                                        <CardContent className="flex items-center justify-between p-6">
+                                            <div>
+                                                <h3 className="text-lg font-semibold">{quiz.title}</h3>
+                                                <p className="text-sm text-muted-foreground mt-1">
+                                                    <span>{quiz.difficulty || 'Easy'}</span> • <span>Max Score: {quiz.questionIds.length * 10}</span>
+                                                </p>
+                                            </div>
+                                            <Button asChild variant="outline">
+                                                <Link href={`/quiz/${quiz.id}`}>Solve Challenge</Link>
+                                            </Button>
+                                        </CardContent>
+                                    </Card>
+                                ))
+                            )}
+                        </div>
                     </div>
-                ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {quizzes.map(quiz => (
-                            <Card key={quiz.id} className="hover:shadow-lg transition-shadow flex flex-col bg-background/50">
-                                <CardHeader>
-                                    <CardTitle className="font-headline">{quiz.title}</CardTitle>
-                                    <CardDescription>{quiz.description}</CardDescription>
-                                </CardHeader>
-                                <CardContent className="flex-grow">
-                                    <div className="text-sm text-muted-foreground space-y-2">
-                                        <div className="flex items-center gap-2">
-                                            <Book className="h-4 w-4" />
-                                            <span>{quiz.questionIds?.length || 0} Questions</span>
-                                        </div>
-                                        <div className="flex items-center gap-2">
-                                            <Clock className="h-4 w-4" />
-                                            <span>{quiz.durationMinutes} minutes</span>
-                                        </div>
-                                        <span className="inline-block bg-primary/10 text-primary text-xs px-2 py-1 rounded-full mt-2 uppercase font-semibold">{quiz.category || "General"}</span>
+
+                    {/* Sidebar */}
+                    <aside className="lg:col-span-3">
+                        <div className="space-y-6">
+                            <div>
+                                <h3 className="font-semibold text-sm uppercase text-muted-foreground mb-4">Status</h3>
+                                <div className="space-y-3">
+                                    <div className="flex items-center">
+                                        <CheckSquare className="h-4 w-4 text-muted-foreground mr-2" />
+                                        <Label>Solved</Label>
                                     </div>
-                                </CardContent>
-                                <CardFooter>
-                                    <Button asChild className="w-full">
-                                        <Link href={`/quiz/${quiz.id}`}>Start Quiz</Link>
-                                    </Button>
-                                </CardFooter>
-                            </Card>
-                        ))}
-                    </div>
-                )}
+                                    <div className="flex items-center">
+                                        <Square className="h-4 w-4 text-muted-foreground mr-2" />
+                                        <Label>Unsolved</Label>
+                                    </div>
+                                </div>
+                            </div>
+                             <div>
+                                <h3 className="font-semibold text-sm uppercase text-muted-foreground mb-4">Skills</h3>
+                                <div className="space-y-3">
+                                    <div className="flex items-center">
+                                        <Square className="h-4 w-4 text-muted-foreground mr-2" />
+                                        <Label>Java (Basic)</Label>
+                                    </div>
+                                     <div className="flex items-center">
+                                        <Square className="h-4 w-4 text-muted-foreground mr-2" />
+                                        <Label>Java (Intermediate)</Label>
+                                    </div>
+                                     <div className="flex items-center">
+                                        <Square className="h-4 w-4 text-muted-foreground mr-2" />
+                                        <Label>Problem Solving (Intermediate)</Label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </aside>
+                </div>
+
             </main>
         </div>
     );
 }
+
+// Add a Checkbox-like component for the filter UI, as it's not a standard shadcn component
+const Checkbox = ({ checked }: { checked: boolean }) => {
+    return (
+        <div className={`h-4 w-4 border rounded-sm flex items-center justify-center ${checked ? 'bg-primary border-primary' : 'bg-white'}`}>
+            {checked && <Check className="h-3 w-3 text-white" />}
+        </div>
+    );
+};

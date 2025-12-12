@@ -4,7 +4,10 @@ import Editor from "@monaco-editor/react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { CodingQuestion } from "@/types/schema";
-import { executeCode, LANGUAGE_IDS } from "@/lib/code-execution";
+import { executeCode } from "@/lib/code-execution";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface CodingViewProps {
     question: CodingQuestion;
@@ -19,24 +22,9 @@ export default function CodingView({ question, onCodeChange, currentCode }: Codi
     const handleRun = async () => {
         setExecuting(true);
         try {
-            // Run against first test case or custom input
-            const testCase = question.testCases[0];
-            const result = await executeCode(
-                currentCode,
-                LANGUAGE_IDS[question.language] || 63,
-                testCase.input
-            );
-
+            const result = await executeCode(currentCode, question.solutionCode);
             let out = result.stdout || result.stderr || result.compile_output || result.message;
             setOutput(out);
-
-            // Simple verification
-            if (result.stdout?.trim() === testCase.expectedOutput.trim()) {
-                setOutput((prev) => prev + "\n\n✅ Test Case Passed!");
-            } else {
-                setOutput((prev) => prev + `\n\n❌ Expected: ${testCase.expectedOutput}\nGot: ${result.stdout}`);
-            }
-
         } catch (err) {
             setOutput("Error executing code.");
         } finally {
@@ -45,26 +33,54 @@ export default function CodingView({ question, onCodeChange, currentCode }: Codi
     };
 
     return (
-        <div className="grid grid-cols-2 gap-4 h-[600px]">
-            <div className="flex flex-col border rounded-md overflow-hidden">
-                <div className="bg-gray-100 p-2 border-b font-mono text-sm">Editor ({question.language})</div>
-                <Editor
-                    height="100%"
-                    defaultLanguage={question.language}
-                    value={currentCode}
-                    onChange={(val) => onCodeChange(val || "")}
-                    theme="vs-dark"
-                    options={{ minimap: { enabled: false }, fontSize: 14 }}
-                />
+        <div className="flex h-full">
+            <div className="w-1/2 p-4">
+                <ScrollArea className="h-full pr-4">
+                    <h2 className="text-2xl font-bold mb-2">{question.title}</h2>
+                    <div className="prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: question.description }}/>
+
+                    <div className="mt-6">
+                        <h3 className="font-semibold mb-2">Visible Test Cases</h3>
+                        {question.testCases.filter(tc => !tc.isHidden).map((tc, i) => (
+                             <Card key={i} className="mb-2 bg-gray-50 font-mono text-sm">
+                                <CardContent className="p-3">
+                                   <p><span className="font-semibold">Input:</span> {tc.input}</p>
+                                   <p><span className="font-semibold">Expected Output:</span> {tc.expectedOutput}</p>
+                                </CardContent>
+                            </Card>
+                        ))}
+                    </div>
+                </ScrollArea>
             </div>
-            <div className="flex flex-col space-y-4">
-                <div className="flex-1 border rounded-md p-4 bg-gray-900 text-green-400 font-mono text-sm whitespace-pre-wrap overflow-auto">
-                    {output || "Run code to see output..."}
-                </div>
-                <div className="flex justify-end">
-                    <Button onClick={handleRun} disabled={executing}>
-                        {executing ? "Running..." : "Run Code"}
-                    </Button>
+            <div className="w-1/2 flex flex-col border-l">
+                 <div className="flex-grow flex flex-col">
+                    <Editor
+                        height="60%"
+                        defaultLanguage={question.language}
+                        value={currentCode}
+                        onChange={(val) => onCodeChange(val || "")}
+                        theme="vs-dark"
+                        options={{ minimap: { enabled: false }, fontSize: 14, scrollBeyondLastLine: false }}
+                    />
+                    <div className="flex-grow flex flex-col border-t">
+                         <Tabs defaultValue="output" className="flex-grow flex flex-col">
+                            <TabsList className="px-2 border-b rounded-none justify-start">
+                                <TabsTrigger value="output">Output</TabsTrigger>
+                            </TabsList>
+                            <TabsContent value="output" className="flex-grow p-2 bg-gray-900 text-white mt-0">
+                               <ScrollArea className="h-full">
+                                    <pre className="text-sm font-mono whitespace-pre-wrap">
+                                        {executing ? "Executing..." : (output || "Run code to see output...")}
+                                    </pre>
+                               </ScrollArea>
+                            </TabsContent>
+                        </Tabs>
+                        <div className="p-2 border-t bg-white flex justify-end">
+                            <Button onClick={handleRun} disabled={executing}>
+                                {executing ? "Running..." : "Run Code"}
+                            </Button>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
