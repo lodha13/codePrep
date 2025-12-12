@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { collection, getDocs, query, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { Quiz } from "@/types/schema";
+import { Quiz, QuizResult } from "@/types/schema";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
@@ -28,15 +28,32 @@ export default function CandidateDashboard() {
 
     useEffect(() => {
         const fetchQuizzes = async () => {
+            if (!user) {
+                setLoading(false);
+                return;
+            };
+
             setLoading(true);
-            const q = query(collection(db, "quizzes"), where("isPublic", "==", true));
-            const snapshot = await getDocs(q);
-            const list = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Quiz));
-            setQuizzes(list);
+
+            // 1. Fetch the user's results first
+            const resultsRef = collection(db, "users", user.uid, "results");
+            const resultsSnapshot = await getDocs(resultsRef);
+            const completedQuizIds = resultsSnapshot.docs.map(doc => (doc.data() as QuizResult).quizId);
+
+            // 2. Fetch all public quizzes
+            const quizzesQuery = query(collection(db, "quizzes"), where("isPublic", "==", true));
+            const quizzesSnapshot = await getDocs(quizzesQuery);
+            const allPublicQuizzes = quizzesSnapshot.docs.map(d => ({ id: d.id, ...d.data() } as Quiz));
+
+            // 3. Filter out the completed quizzes
+            const availableQuizzes = allPublicQuizzes.filter(quiz => !completedQuizIds.includes(quiz.id));
+
+            setQuizzes(availableQuizzes);
             setLoading(false);
         };
+
         fetchQuizzes();
-    }, []);
+    }, [user]);
 
     const getInitials = (name?: string) => {
         if (!name) return "U";
@@ -106,7 +123,7 @@ export default function CandidateDashboard() {
                             ) : quizzes.length === 0 ? (
                                 <div className="flex flex-col items-center justify-center text-center py-20 border-2 border-dashed rounded-lg">
                                     <h3 className="text-2xl font-bold font-headline">No Quizzes Available</h3>
-                                    <p className="text-muted-foreground mt-2">Please check back later for assigned quizzes.</p>
+                                    <p className="text-muted-foreground mt-2">You've completed all available quizzes. Please check back later!</p>
                                 </div>
                             ) : (
                                 quizzes.map(quiz => (
