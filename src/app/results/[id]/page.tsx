@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { doc, getDoc, collection, getDocs, query, where, documentId } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { QuizResult, Question, Quiz, QuestionResult } from "@/types/schema";
+import { QuizResult, Question, Quiz, QuestionResult, CodingQuestion } from "@/types/schema";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
@@ -14,6 +14,7 @@ import { useAuth } from "@/context/AuthContext";
 
 type HydratedAnswer = QuestionResult & {
     questionTitle?: string;
+    questionType?: 'mcq' | 'coding';
 };
 
 export default function ResultPage() {
@@ -71,7 +72,8 @@ export default function ResultPage() {
 
     const hydratedAnswers: HydratedAnswer[] = Object.values(result.answers).map(ans => ({
         ...ans,
-        questionTitle: questions[ans.questionId]?.title || 'Unknown Question'
+        questionTitle: questions[ans.questionId]?.title || 'Unknown Question',
+        questionType: questions[ans.questionId]?.type
     }));
     
     const getStatusIcon = (status: 'correct' | 'incorrect' | 'partial') => {
@@ -112,16 +114,25 @@ export default function ResultPage() {
             <div className="space-y-4">
                 <h2 className="text-2xl font-bold font-headline">Detailed Breakdown</h2>
                 {hydratedAnswers.map((ans, idx) => (
-                    <Card key={idx} className="flex justify-between items-center p-4">
-                        <div className="flex items-center gap-4">
-                            {getStatusIcon(ans.status)}
-                            <div>
-                                <p className="font-semibold">{ans.questionTitle}</p>
-                                <p className="text-xs text-muted-foreground mt-1">Your answer: <span className="font-mono bg-gray-100 p-1 rounded text-xs">{ans.userAnswer || "No Answer"}</span></p>
+                    <Card key={idx} className="p-4">
+                       <div className="flex justify-between items-start">
+                             <div className="flex items-start gap-4">
+                                {getStatusIcon(ans.status)}
+                                <div>
+                                    <p className="font-semibold">{ans.questionTitle}</p>
+                                </div>
                             </div>
-                        </div>
-                        <div className="font-bold text-lg">
-                            {ans.score} / {ans.total} pts
+                            <div className="font-bold text-lg text-right">
+                                {ans.score} / {ans.total} pts
+                            </div>
+                       </div>
+                        <div className="mt-4 pl-10">
+                            <p className="text-xs text-muted-foreground">Your answer:</p>
+                             {ans.questionType === 'coding' ? (
+                                <pre className="mt-1 font-mono bg-gray-100 p-3 rounded text-xs whitespace-pre-wrap w-full overflow-x-auto"><code>{ans.userAnswer || "No Answer"}</code></pre>
+                             ) : (
+                                <p className="font-mono bg-gray-100 p-2 rounded text-sm inline-block mt-1">{ans.userAnswer || "No Answer"}</p>
+                             )}
                         </div>
                     </Card>
                 ))}
