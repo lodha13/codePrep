@@ -1,7 +1,6 @@
 
 'use server';
 
-import { ai as genkitAi } from 'genkit';
 import { z } from 'zod';
 import { ai } from '@/ai/genkit';
 
@@ -55,7 +54,7 @@ const QuizGenerationOutputSchema = z.object({
 export type QuizGenerationOutput = z.infer<typeof QuizGenerationOutputSchema>;
 
 
-const prompt = genkitAi.definePrompt({
+const prompt = ai.definePrompt({
   name: 'quizGenerationPrompt',
   input: { schema: QuizGenerationInputSchema },
   output: { schema: QuizGenerationOutputSchema },
@@ -81,25 +80,18 @@ const prompt = genkitAi.definePrompt({
 });
 
 
-const quizGenerationFlow = genkitAi.defineFlow(
+const quizGenerationFlow = ai.defineFlow(
   {
     name: 'quizGenerationFlow',
     inputSchema: QuizGenerationInputSchema,
     outputSchema: QuizGenerationOutputSchema,
   },
   async (input) => {
-    const llmResponse = await ai.generate({
-        prompt: {
-            ...prompt,
-            input: input,
-        }
-    });
-
-    const output = llmResponse.output();
+    const { output } = await prompt(input);
     if (!output) {
       throw new Error('AI failed to generate quiz. The response was empty.');
     }
-    return output as QuizGenerationOutput;
+    return output;
   }
 );
 
