@@ -7,34 +7,39 @@ import { UserRole } from "@/types/schema";
 
 interface ProtectedRouteProps {
     children: React.ReactNode;
-    allowedRoles?: UserRole[];
+    allowedRoles: UserRole[]; // Made mandatory
 }
 
 export default function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) {
-    const { user, loading } = useAuth();
+    const { user, loading, role } = useAuth();
     const router = useRouter();
 
     useEffect(() => {
-        if (!loading) {
-            if (!user) {
-                router.push("/login");
-            } else if (allowedRoles && !allowedRoles.includes(user.role)) {
-                router.push("/"); // Or unauthorized page
-            }
+        if (loading) {
+            return; // Wait for the auth state to be confirmed
         }
-    }, [user, loading, router, allowedRoles]);
 
-    if (loading) {
-        return <div>Loading...</div>; // Replace with a spinner
+        if (!user) {
+            // This case should be handled by AuthRedirector, but as a fallback
+            router.push("/login");
+            return;
+        }
+
+        if (!allowedRoles.includes(role!)) {
+            // If user's role is not allowed, redirect them.
+            // A good place would be their own dashboard or a dedicated 'unauthorized' page.
+            const targetDashboard = user.role === 'admin' ? '/admin' : '/candidate';
+            router.push(targetDashboard);
+        }
+
+    }, [user, loading, role, router, allowedRoles]);
+
+
+    // While loading, or if user is null, or if role doesn't match, don't render children
+    if (loading || !user || !role || !allowedRoles.includes(role)) {
+         return <div className="flex h-screen w-screen items-center justify-center">Checking permissions...</div>;
     }
 
-    if (!user) {
-        return null;
-    }
-
-    if (allowedRoles && !allowedRoles.includes(user.role)) {
-        return null; // Or unauth message
-    }
-
+    // If everything is fine, render the children
     return <>{children}</>;
 }

@@ -24,7 +24,9 @@ export default function LoginPage() {
         setLoading(true);
         try {
             await signInWithEmailAndPassword(auth, email, password);
-            router.push("/"); // Redirect to dashboard, protection logic handles where
+            // AuthProvider and AuthRedirector will handle the redirection logic
+            // We just need to push them to a generic page after login.
+            router.push("/");
         } catch (err: any) {
             setError("Invalid email or password. Please try again.");
         } finally {

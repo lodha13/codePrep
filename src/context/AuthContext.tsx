@@ -3,7 +3,7 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import { User as FirebaseUser, onAuthStateChanged, signOut as firebaseSignOut } from "firebase/auth";
 import { auth, db } from "@/lib/firebase";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, getDoc, setDoc } from "firebase/firestore";
 import { User, UserRole } from "@/types/schema";
 
 interface AuthContextType {
@@ -31,14 +31,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
             setFirebaseUser(fbUser);
             if (fbUser) {
-                // Fetch user profile from Firestore
-                const userDoc = await getDoc(doc(db, "users", fbUser.uid));
+                const userDocRef = doc(db, "users", fbUser.uid);
+                const userDoc = await getDoc(userDocRef);
                 if (userDoc.exists()) {
                     setUser(userDoc.data() as User);
                 } else {
-                    // If user exists in Auth but not Firestore, it might be a new registration
-                    // The registration component should handle creating the user doc
-                    setUser(null);
+                     // This case can happen if a user is created in Firebase Auth
+                    // but the corresponding Firestore document creation fails.
+                    // We can try to create it here as a fallback.
+                    const newUser: User = {
+                        uid: fbUser.uid,
+                        email: fbUser.email!,
+                        displayName: fbUser.displayName || 'New User',
+                        role: "candidate", // Default role
+                        createdAt: new Date(),
+                    };
+                    await setDoc(userDocRef, newUser);
+                    setUser(newUser);
                 }
             } else {
                 setUser(null);

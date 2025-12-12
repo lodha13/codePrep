@@ -3,6 +3,7 @@ import { Inter, Space_Grotesk, Source_Code_Pro } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/context/AuthContext";
 import { Toaster } from "@/components/ui/toaster";
+import AuthRedirector from "@/components/auth/AuthRedirector";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 const spaceGrotesk = Space_Grotesk({ subsets: ["latin"], variable: "--font-space-grotesk" });
@@ -21,7 +22,11 @@ export default function RootLayout({
     return (
         <html lang="en" className={`${inter.variable} ${spaceGrotesk.variable} ${sourceCodePro.variable}`}>
             <body>
-                <AuthProvider>{children}</AuthProvider>
+                <AuthProvider>
+                    <AuthRedirector>
+                        {children}
+                    </AuthRedirector>
+                </AuthProvider>
                 <Toaster />
             </body>
         </html>

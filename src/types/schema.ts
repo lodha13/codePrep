@@ -7,7 +7,7 @@ export interface User {
     email: string;
     displayName?: string;
     role: UserRole;
-    createdAt: Timestamp;
+    createdAt: Date; // Changed to Date for consistency
 }
 
 export interface Quiz {
@@ -19,8 +19,8 @@ export interface Quiz {
     subCategory?: string;
     type: "assessment" | "practice";
     questionIds: string[];
-    createdBy: string;
-    createdAt: Timestamp;
+    createdBy: string; // User ID
+    createdAt: Date;
     isPublic: boolean;
 }
 
@@ -28,12 +28,13 @@ export type QuestionType = "mcq" | "coding";
 
 export interface BaseQuestion {
     id: string;
-    quizId?: string; // Optional, as questions might be in a bank
     title: string;
     description: string; // Markdown supported
     type: QuestionType;
     difficulty: "easy" | "medium" | "hard";
-    createdAt: Timestamp;
+    createdAt: Date;
+    // New property for image-based questions
+    imageUrl?: string;
 }
 
 export interface MCQQuestion extends BaseQuestion {
@@ -45,12 +46,12 @@ export interface MCQQuestion extends BaseQuestion {
 export interface TestCase {
     input: string;
     expectedOutput: string;
-    isHidden?: boolean;
+    isHidden: boolean; // Control visibility to candidate
 }
 
 export interface CodingQuestion extends BaseQuestion {
     type: "coding";
-    language: "javascript" | "python" | "java" | "cpp"; // default language
+    language: "javascript" | "python" | "java" | "cpp";
     starterCode: string;
     testCases: TestCase[];
     solutionCode?: string; // For reference/grading
@@ -71,8 +72,8 @@ export interface QuizResult {
     id: string;
     quizId: string;
     userId: string;
-    startedAt: Timestamp;
-    completedAt?: Timestamp;
+    startedAt: Date;
+    completedAt?: Date;
     score: number;
     totalScore: number;
     status: "in-progress" | "completed";
