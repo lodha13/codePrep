@@ -31,7 +31,6 @@ const LANGUAGE_ID_MAP: Record<CodingQuestion["language"], number> = {
 
 const judge0Endpoint = 'https://ce.judge0.com/submissions?base64_encoded=true&wait=true';
 
-
 const decode = (str: string | undefined | null): string => {
   if (!str) return "";
   try {
@@ -67,22 +66,21 @@ export async function executeCode(
     });
 
     if (!compileRes.ok) {
-         const errorText = await compileRes.text();
-         return {
-            stdout: null,
-            stderr: `Judge0 API Error: ${errorText}`,
-            compile_output: `Judge0 API Error: ${errorText}`,
-            message: "Judge0 API Error",
-            status: { id: 13, description: "Internal Error" },
-            time: "0",
-            memory: 0,
-        };
+      const errorText = await compileRes.text();
+      return {
+        stdout: null,
+        stderr: `Judge0 API Error: ${errorText}`,
+        compile_output: `Judge0 API Error: ${errorText}`,
+        message: "Judge0 API Error",
+        status: { id: 13, description: "Internal Error" },
+        time: "0",
+        memory: 0,
+      };
     }
 
     const compileResult = await compileRes.json();
-    
-    // 6 = Compilation Error
-    if (compileResult.status?.id === 6) {
+
+    if (compileResult.status?.id === 6) { // 6 = Compilation Error
       return {
         stdout: null,
         stderr: decode(compileResult.stderr),
@@ -98,19 +96,17 @@ export async function executeCode(
     // -----------------------------------------------------
     // 2️⃣ RUN TEST CASES
     // -----------------------------------------------------
-    const submissions = testCases.map((tc) => ({
-      language_id,
-      source_code: encodedSource,
-
-      stdin: tc.input
-        ? Buffer.from(tc.input).toString("base64")
-        : undefined,
-
-      expected_output: tc.expectedOutput
-        ? Buffer.from(tc.expectedOutput).toString("base64")
-        : undefined,
-    }));
-
+    const submissions = testCases.map((tc) => {
+        const input = tc.input ?? ""; // Ensure input is at least an empty string
+        const expectedOutput = tc.expectedOutput ?? "";
+        return {
+            language_id,
+            source_code: encodedSource,
+            stdin: Buffer.from(input).toString("base64"),
+            expected_output: Buffer.from(expectedOutput).toString("base64"),
+        };
+    });
+    
     const results = await Promise.allSettled(
       submissions.map((payload) =>
         fetch(judge0Endpoint, {
@@ -129,11 +125,13 @@ export async function executeCode(
     const test_case_results: TestCaseResult[] = results.map(
       (res: any, index: number) => {
         const tc = testCases[index];
+        const input = tc.input ?? "";
+        const expected = tc.expectedOutput ?? "";
 
         if (res.status !== "fulfilled" || !res.value) {
           return {
-            input: tc.input || "",
-            expected: tc.expectedOutput || "",
+            input,
+            expected,
             actual: `Failed to execute test case ${index + 1}.`,
             passed: false,
           };
@@ -143,15 +141,15 @@ export async function executeCode(
         const isPass = data.status?.id === 3; // 3 = Accepted
 
         if (isPass) passed_tests++;
-        
-        // If status is "Wrong Answer" (4), the output is in stdout. For other errors, it might be in stderr.
+
+        const decodedStdout = decode(data.stdout);
         const actual_output = (data.status?.id === 3 || data.status?.id === 4)
-             ? decode(data.stdout)
+             ? decodedStdout
              : `${data.status?.description || 'Error'}\n${decode(data.stderr) || ''}\n${decode(data.compile_output) || ''}`.trim();
 
         return {
-          input: tc.input,
-          expected: tc.expectedOutput || "",
+          input,
+          expected,
           actual: actual_output.trim(),
           passed: isPass,
         };
@@ -159,17 +157,17 @@ export async function executeCode(
     );
 
     const totalTime = results.reduce((acc: number, r: any) => {
-        if (r.status === 'fulfilled' && r.value?.time) {
-            return acc + parseFloat(r.value.time);
-        }
-        return acc;
+      if (r.status === 'fulfilled' && r.value?.time) {
+        return acc + parseFloat(r.value.time);
+      }
+      return acc;
     }, 0);
 
     const maxMemory = results.reduce((acc: number, r: any) => {
-        if (r.status === 'fulfilled' && r.value?.memory) {
-            return Math.max(acc, r.value.memory);
-        }
-        return acc;
+      if (r.status === 'fulfilled' && r.value?.memory) {
+        return Math.max(acc, r.value.memory);
+      }
+      return acc;
     }, 0);
 
     const finalStatus =
