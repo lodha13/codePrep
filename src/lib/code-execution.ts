@@ -1,5 +1,6 @@
 
 import { CodingQuestion } from "@/types/schema";
+import { Buffer } from 'buffer';
 
 export interface TestCaseResult {
     input: string;
@@ -23,7 +24,7 @@ export interface ExecutionResult {
 
 
 // Maps our simple language names to Judge0's language IDs
-// See https://judge0.com/api/languages
+// See https://ce.judge0.com/languages
 const LANGUAGE_ID_MAP: Record<CodingQuestion['language'], number> = {
     java: 91, // Java 17
     javascript: 93, // Node.js 18.15.0
@@ -33,11 +34,13 @@ const LANGUAGE_ID_MAP: Record<CodingQuestion['language'], number> = {
 
 /**
  * Extracts the input values from the test case string.
- * Example: "nums = [2,7,11,15], target = 9" -> "2,7,11,15\n9"
- * This is a simplified parser and might need to be made more robust.
+ * Example: "nums = [2,7,11,15], target = 9" -> "2 7 11 15\n9"
+ * This parser assumes space-separated or newline-separated inputs.
+ * It's a simplified version and might need adjustment for complex inputs.
  */
 function parseInput(input: string): string {
-    return input.split(',')
+    return input
+        .split(',')
         .map(part => part.split('=')[1].trim())
         .join('\n');
 }
@@ -48,46 +51,39 @@ export async function executeCode(
     testCases: any[]
 ): Promise<ExecutionResult> {
 
-    const apiKey = process.env.NEXT_PUBLIC_RAPIDAPI_KEY;
-    const apiHost = process.env.NEXT_PUBLIC_RAPIDAPI_HOST;
-
-    if (!apiKey || !apiHost) {
-        throw new Error("Judge0 API key or host is not configured in environment variables.");
-    }
-    
     const language_id = LANGUAGE_ID_MAP[language];
     if (!language_id) {
         throw new Error(`Unsupported language: ${language}`);
     }
-    
+
     const test_case_results: TestCaseResult[] = [];
     let passed_tests = 0;
     
     let totalTime = 0;
     let totalMemory = 0;
+    let finalStatusId = 3; // Assume "Accepted" until a failure occurs
 
     for (const tc of testCases) {
-        // Judge0 expects base64 encoded strings for certain fields, but we will use the wait=true parameter
-        // which works with plain text.
+        // Base64 encode for Judge0
         const submissionPayload = {
-            source_code: source_code,
+            source_code: Buffer.from(source_code).toString('base64'),
             language_id: language_id,
-            stdin: parseInput(tc.input),
-            expected_output: tc.expectedOutput,
+            stdin: Buffer.from(parseInput(tc.input)).toString('base64'),
+            expected_output: Buffer.from(tc.expectedOutput).toString('base64'),
         };
 
-        const response = await fetch(`https://${apiHost}/submissions?base64_encoded=false&wait=true`, {
+        const response = await fetch(`https://judge0-ce.p.rapidapi.com/submissions?base64_encoded=true&wait=true`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'X-RapidAPI-Key': apiKey,
-                'X-RapidAPI-Host': apiHost,
+                // For public API, no key is needed. If you use a private/RapidAPI instance, add headers here.
+                // 'X-RapidAPI-Key': 'YOUR_API_KEY',
+                // 'X-RapidAPI-Host': 'judge0-ce.p.rapidapi.com'
             },
             body: JSON.stringify(submissionPayload),
         });
 
         if (!response.ok) {
-            // Handle HTTP errors from the API itself
             const errorBody = await response.text();
             return {
                 stdout: null,
@@ -102,17 +98,15 @@ export async function executeCode(
 
         const result = await response.json();
         
-        // Accumulate time and memory
         totalTime += parseFloat(result.time || "0");
         totalMemory = Math.max(totalMemory, parseFloat(result.memory || "0"));
 
-        // If there's a compilation error, stop immediately and report it.
-        if (result.status.id === 6) { // 6 is Compilation Error
+        if (result.status.id === 6) { // Compilation Error
             return {
                 stdout: null,
-                stderr: result.stderr ? atob(result.stderr) : null,
-                compile_output: result.compile_output ? atob(result.compile_output) : "Compilation Failed",
-                message: result.message ? atob(result.message) : "Compilation Error",
+                stderr: result.stderr ? Buffer.from(result.stderr, 'base64').toString('utf-8') : null,
+                compile_output: result.compile_output ? Buffer.from(result.compile_output, 'base64').toString('utf-8') : "Compilation Failed",
+                message: result.message ? Buffer.from(result.message, 'base64').toString('utf-8') : "Compilation Error",
                 status: result.status,
                 time: "0.0",
                 memory: 0,
@@ -121,18 +115,23 @@ export async function executeCode(
             };
         }
         
-        const actualOutput = (result.stdout ? atob(result.stdout) : "").trim();
+        const actualOutput = (result.stdout ? Buffer.from(result.stdout, 'base64').toString('utf-8') : "").trim();
         const expectedOutput = (tc.expectedOutput || "").trim();
-        const passed = result.status.id === 3; // 3 is "Accepted" which means it matched expected output
+        const passed = result.status.id === 3; // 3 is "Accepted"
 
         if (passed) {
             passed_tests++;
+        }
+        
+        // Update final status if this is the first failure
+        if (!passed && finalStatusId === 3) {
+            finalStatusId = result.status.id;
         }
 
         test_case_results.push({
             input: tc.input,
             expected: expectedOutput,
-            actual: actualOutput || (result.stderr ? atob(result.stderr) : "No output"),
+            actual: actualOutput || (result.stderr ? Buffer.from(result.stderr, 'base64').toString('utf-8') : "No output"),
             passed: passed,
         });
 
@@ -142,12 +141,28 @@ export async function executeCode(
         }
     }
     
-    const allPassed = passed_tests === testCases.length;
-    const finalStatus = allPassed ? { id: 3, description: "Accepted" } : { id: 4, description: "Wrong Answer" };
+    const statusDescriptions: Record<number, string> = {
+        1: 'In Queue',
+        2: 'Processing',
+        3: 'Accepted',
+        4: 'Wrong Answer',
+        5: 'Time Limit Exceeded',
+        6: 'Compilation Error',
+        7: 'Runtime Error (SIGSEGV)',
+        8: 'Runtime Error (SIGXFSZ)',
+        9: 'Runtime Error (SIGFPE)',
+        10: 'Runtime Error (SIGABRT)',
+        11: 'Runtime Error (NZEC)',
+        12: 'Runtime Error (Other)',
+        13: 'Internal Error',
+        14: 'Exec Format Error',
+    };
+    
+    const finalStatus = { id: finalStatusId, description: statusDescriptions[finalStatusId] || "Error" };
 
     return {
-        stdout: allPassed ? "All test cases passed!" : null,
-        stderr: allPassed ? null : "One or more test cases failed.",
+        stdout: finalStatusId === 3 ? "All test cases passed!" : null,
+        stderr: finalStatusId !== 3 ? "One or more test cases failed." : null,
         compile_output: null,
         message: finalStatus.description,
         status: finalStatus,
