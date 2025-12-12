@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useEffect, useState } from "react";
@@ -11,9 +12,9 @@ import Link from "next/link";
 import { CheckCircle, XCircle } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 
-interface HydratedAnswer extends QuizResult['answers'][string] {
+type HydratedAnswer = QuizResult['answers'][string] & {
     questionTitle?: string;
-}
+};
 
 export default function ResultPage() {
     const { id } = useParams(); // resultId
