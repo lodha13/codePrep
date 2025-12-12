@@ -49,11 +49,11 @@ export async function executeCode(source_code: string, solution_code?: string, t
     }
 
     // Simulate partial success for other cases. Let's say it passes 1 of the visible tests.
-    const passed_tests = Math.min(1, total_tests); 
+    const passed_tests = Math.min(1, testCases.filter(tc => !tc.isHidden).length); 
     const first_failed_case = testCases.find(tc => !tc.isHidden) || testCases[0];
 
     return {
-        stdout: `Input: ${first_failed_case?.input || 'N/A'}\nExpected: ${first_failed_case?.expectedOutput || 'N/A'}\nGot: []`,
+        stdout: `Input: ${first_failed_case?.input ?? 'N/A'}\nExpected: ${first_failed_case?.expectedOutput ?? 'N/A'}\nGot: []`,
         stderr: "",
         compile_output: "",
         message: "Wrong Answer",
