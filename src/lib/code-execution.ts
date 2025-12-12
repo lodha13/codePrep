@@ -35,6 +35,7 @@ const decode = (str: string | undefined | null): string => {
     try {
         return Buffer.from(str, 'base64').toString('utf-8');
     } catch (e) {
+        console.error("Base64 decoding error:", e);
         return "Error decoding output.";
     }
 };
@@ -59,11 +60,7 @@ export async function executeCode(
 
         const compileResponse = await fetch(`https://judge0-ce.p.rapidapi.com/submissions?base64_encoded=true&wait=true`, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-RapidAPI-Host': 'judge0-ce.p.rapidapi.com',
-                'X-RapidAPI-Key': process.env.NEXT_PUBLIC_RAPIDAPI_KEY!,
-            },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(compileCheckPayload),
         });
         
@@ -86,7 +83,7 @@ export async function executeCode(
         if (compileResult.status?.id === 6 || compileResult.compile_output) {
             return {
                 stdout: null,
-                stderr: null,
+                stderr: decode(compileResult.stderr),
                 compile_output: decode(compileResult.compile_output),
                 message: "Compilation Error",
                 status: compileResult.status,
@@ -107,11 +104,7 @@ export async function executeCode(
             submissionPayloads.map(payload =>
                 fetch(`https://judge0-ce.p.rapidapi.com/submissions?base64_encoded=true&wait=true`, {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-RapidAPI-Host': 'judge0-ce.p.rapidapi.com',
-                        'X-RapidAPI-Key': process.env.NEXT_PUBLIC_RAPIDAPI_KEY!,
-                    },
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload),
                 }).then(res => {
                     if (!res.ok) {
@@ -160,8 +153,15 @@ export async function executeCode(
             };
         });
 
-        const totalTime = responses.reduce((acc, r) => acc + parseFloat(r.status === 'fulfilled' && r.value ? (r.value.time || "0") : "0"), 0);
-        const maxMemory = responses.reduce((acc, r) => Math.max(acc, r.status === 'fulfilled' && r.value ? (r.value.memory || 0) : 0), 0);
+        const totalTime = responses.reduce((acc, res) => {
+            const time = (res.status === 'fulfilled' && res.value?.time) ? parseFloat(res.value.time) : 0;
+            return acc + time;
+        }, 0);
+        
+        const maxMemory = responses.reduce((acc, res) => {
+             const memory = (res.status === 'fulfilled' && res.value?.memory) ? res.value.memory : 0;
+            return Math.max(acc, memory);
+        }, 0);
         
         const finalStatus = passed_tests === testCases.length 
             ? { id: 3, description: "Accepted" }
