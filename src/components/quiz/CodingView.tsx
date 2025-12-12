@@ -31,11 +31,11 @@ export default function CodingView({ question, onCodeChange, currentCode }: Codi
         try {
             // Only run against VISIBLE test cases
             const visibleTestCases = question.testCases.filter(tc => !tc.isHidden);
-            const result = await executeCode(currentCode, visibleTestCases);
+            const result = await executeCode(currentCode, question.language, visibleTestCases);
             setExecutionResult(result);
-        } catch (err) {
+        } catch (err: any) {
             setExecutionResult({
-                 stderr: "Error executing code.",
+                 stderr: err.message || "Error executing code.",
                  status: { id: 11, description: "Execution Error" },
                  time: "0",
                  memory: 0,
@@ -58,7 +58,7 @@ export default function CodingView({ question, onCodeChange, currentCode }: Codi
         if (executionResult.compile_output) {
             return <span className="text-red-500">{executionResult.compile_output}</span>;
         }
-        if (executionResult.stderr) {
+        if (executionResult.stderr && !executionResult.test_case_results) {
             return <span className="text-red-500">{executionResult.stderr}</span>;
         }
         if (!executionResult.test_case_results) {

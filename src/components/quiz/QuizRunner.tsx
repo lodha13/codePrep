@@ -77,13 +77,13 @@ export default function QuizRunner({ quiz, questions }: QuizRunnerProps) {
             } else if (q.type === 'coding') {
                 const codingQ = q as CodingQuestion;
                 // On final submit, run against ALL test cases
-                const executionResult = await executeCode(userAnswer || "", codingQ.testCases);
+                const executionResult = await executeCode(userAnswer || "", codingQ.language, codingQ.testCases);
                 
                 questionScore = executionResult.passed_tests || 0;
                 questionMaxScore = executionResult.total_tests || codingQ.testCases.length;
                 testCaseResults = executionResult.test_case_results;
                 
-                if (questionScore === questionMaxScore) {
+                if (questionScore === questionMaxScore && questionMaxScore > 0) {
                     status = 'correct';
                 } else if (questionScore > 0) {
                     status = 'partial';
