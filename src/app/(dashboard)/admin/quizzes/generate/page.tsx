@@ -1,8 +1,8 @@
 
 "use client";
 
-import { useState } from "react";
-import { useFormState, useFormStatus } from "react-dom";
+import { useState, useEffect, useActionState } from "react";
+import { useFormStatus } from "react-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -10,7 +10,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { generateQuizAction } from "./actions";
 import { useToast } from "@/components/ui/use-toast";
-import { useEffect } from "react";
 import Link from "next/link";
 import { ArrowLeft, Wand2 } from "lucide-react";
 
@@ -36,7 +35,7 @@ function SubmitButton() {
 }
 
 export default function GenerateQuizPage() {
-    const [state, formAction] = useFormState(generateQuizAction, initialState);
+    const [state, formAction] = useActionState(generateQuizAction, initialState);
     const { toast } = useToast();
 
     useEffect(() => {
