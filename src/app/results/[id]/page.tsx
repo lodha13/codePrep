@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { CheckCircle, XCircle, ChevronRight, AlertCircle } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import { Badge } from "@/components/ui/badge";
 
 type HydratedAnswer = QuestionResult & {
     questionTitle?: string;
@@ -99,7 +100,7 @@ export default function ResultPage() {
                              {tc.passed ? <CheckCircle className="h-4 w-4 text-green-500"/> : <XCircle className="h-4 w-4 text-red-500"/>}
                             <span className="font-semibold">Test Case {index + 1}</span>
                          </div>
-                        <Badge variant={tc.passed ? 'default' : 'destructive'} className={cn(tc.passed ? "bg-green-100 text-green-800 border-green-300" : "bg-red-100 text-red-800 border-red-300")}>
+                        <Badge variant={tc.passed ? 'default' : 'destructive'}>
                             {tc.passed ? 'Passed' : 'Failed'}
                         </Badge>
                     </div>
