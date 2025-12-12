@@ -4,7 +4,7 @@
 import Link from "next/link";
 import { getQuizzes, getUsers } from "../actions";
 import { Button } from "@/components/ui/button";
-import { PlusCircle } from "lucide-react";
+import { PlusCircle, Wand2 } from "lucide-react";
 import { AssignQuizClient } from './AssignQuizClient';
 
 export default async function AdminQuizzesPage() {
@@ -23,15 +23,22 @@ export default async function AdminQuizzesPage() {
                     <h1 className="text-3xl font-bold">Quiz Management</h1>
                     <p className="text-gray-500">View, create, and manage quizzes.</p>
                 </div>
-                <Button asChild>
-                    <Link href="/admin/quizzes/create">
-                        <PlusCircle className="mr-2 h-4 w-4" />
-                        Create Quiz
-                    </Link>
-                </Button>
+                <div className="flex items-center gap-2">
+                     <Button asChild variant="outline">
+                        <Link href="/admin/quizzes/generate">
+                            <Wand2 className="mr-2 h-4 w-4" />
+                            Generate with AI
+                        </Link>
+                    </Button>
+                    <Button asChild>
+                        <Link href="/admin/quizzes/create">
+                            <PlusCircle className="mr-2 h-4 w-4" />
+                            Create Manually
+                        </Link>
+                    </Button>
+                </div>
             </div>
             <AssignQuizClient quizzes={quizzes} candidates={candidates} />
         </div>
     );
 }
-
