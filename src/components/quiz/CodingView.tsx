@@ -5,7 +5,7 @@ import Editor from "@monaco-editor/react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { CodingQuestion } from "@/types/schema";
-import { executeCode, ExecutionResult, TestCaseResult } from "@/lib/code-execution";
+import { executeCode, ExecutionResult } from "@/lib/code-execution";
 import { Card, CardContent } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -27,21 +27,22 @@ export default function CodingView({ question, onCodeChange, currentCode }: Codi
         setExecuting(true);
         setExecutionResult(null); // Clear previous results
         setActiveTab("output");
-        
+
         try {
             // Only run against VISIBLE test cases
             const visibleTestCases = question.testCases.filter(tc => !tc.isHidden);
             const result = await executeCode(currentCode, question.language, visibleTestCases);
             setExecutionResult(result);
         } catch (err: any) {
+            // This catch block is for network errors or unexpected issues with the executeCode function itself.
             setExecutionResult({
-                 stderr: err.message || "Error executing code.",
-                 status: { id: 11, description: "Execution Error" },
-                 time: "0",
-                 memory: 0,
-                 compile_output: null,
-                 message: null,
-                 stdout: null,
+                stderr: `An application error occurred while trying to run the code: ${err.message}`,
+                status: { id: -1, description: "Application Error" }, // Custom status for app error
+                time: "0",
+                memory: 0,
+                compile_output: null,
+                message: "Application Error",
+                stdout: null,
             });
         } finally {
             setExecuting(false);
