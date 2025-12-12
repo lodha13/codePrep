@@ -10,6 +10,7 @@ export interface User {
     role: UserRole;
     createdAt: Date; // Changed to Date for consistency
     completedQuizIds?: string[];
+    assignedQuizIds?: string[];
     photoURL?: string;
 }
 
@@ -75,6 +76,7 @@ export interface QuestionResult {
 export interface QuizResult {
     id: string;
     quizId: string;
+    quizTitle: string; // Denormalized for faster reads
     userId: string;
     startedAt: Date | Timestamp;
     completedAt?: Date | Timestamp;

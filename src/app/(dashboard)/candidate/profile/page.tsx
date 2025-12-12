@@ -4,20 +4,16 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { db } from '@/lib/firebase';
-import { collection, query, where, getDocs, documentId } from 'firebase/firestore';
-import { QuizResult, Quiz } from '@/types/schema';
+import { collection, query, where, getDocs } from 'firebase/firestore';
+import { QuizResult } from '@/types/schema';
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Trophy, Calendar } from 'lucide-react';
 
-interface HydratedQuizResult extends QuizResult {
-    quizTitle?: string;
-}
-
 export default function ProfilePage() {
     const { user } = useAuth();
-    const [results, setResults] = useState<HydratedQuizResult[]>([]);
+    const [results, setResults] = useState<QuizResult[]>([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -29,28 +25,14 @@ export default function ProfilePage() {
             const resultsSnap = await getDocs(resultsQuery);
             const userResults = resultsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as QuizResult));
 
-            if (userResults.length > 0) {
-                // Get unique quiz IDs to fetch their details
-                const quizIds = [...new Set(userResults.map(r => r.quizId))];
-                const quizzesQuery = query(collection(db, 'quizzes'), where(documentId(), 'in', quizIds));
-                const quizzesSnap = await getDocs(quizzesQuery);
-                const quizzesData = quizzesSnap.docs.reduce((acc, doc) => {
-                    acc[doc.id] = doc.data() as Quiz;
-                    return acc;
-                }, {} as Record<string, Quiz>);
+            // Sort results by completion date, most recent first
+            userResults.sort((a, b) => {
+                const dateA = (a.completedAt as any)?.toDate() || 0;
+                const dateB = (b.completedAt as any)?.toDate() || 0;
+                return dateB - dateA;
+            });
 
-                // Combine results with quiz titles
-                const hydratedResults = userResults.map(res => ({
-                    ...res,
-                    quizTitle: quizzesData[res.quizId]?.title || 'Unknown Quiz',
-                }));
-                
-                // @ts-ignore
-                hydratedResults.sort((a, b) => b.completedAt.toDate() - a.completedAt.toDate());
-
-                setResults(hydratedResults);
-            }
-
+            setResults(userResults);
             setLoading(false);
         };
 
@@ -91,8 +73,7 @@ export default function ProfilePage() {
                                         </div>
                                          <div className="flex items-center gap-1.5">
                                             <Calendar className="h-4 w-4" />
-                                            {/* @ts-ignore */}
-                                            <span>Completed on {result.completedAt?.toDate().toLocaleDateString()}</span>
+                                            <span>Completed on {(result.completedAt as any)?.toDate().toLocaleDateString()}</span>
                                         </div>
                                     </div>
                                 </div>

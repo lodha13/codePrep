@@ -4,10 +4,11 @@ import "./globals.css";
 import { AuthProvider } from "@/context/AuthContext";
 import { Toaster } from "@/components/ui/toaster";
 import AuthRedirector from "@/components/auth/AuthRedirector";
+import { cn } from "@/lib/utils";
 
-const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
-const spaceGrotesk = Space_Grotesk({ subsets: ["latin"], variable: "--font-space-grotesk" });
-const sourceCodePro = Source_Code_Pro({ subsets: ["latin"], variable: "--font-source-code-pro" });
+const fontSans = Inter({ subsets: ["latin"], variable: "--font-sans" });
+const fontHeading = Space_Grotesk({ subsets: ["latin"], variable: "--font-heading" });
+const fontMono = Source_Code_Pro({ subsets: ["latin"], variable: "--font-mono" });
 
 export const metadata: Metadata = {
     title: "CodePrep Pro",
@@ -20,8 +21,13 @@ export default function RootLayout({
     children: React.ReactNode;
 }>) {
     return (
-        <html lang="en" className={`${inter.variable} ${spaceGrotesk.variable} ${sourceCodePro.variable}`}>
-            <body>
+        <html lang="en" suppressHydrationWarning>
+            <body className={cn(
+                "min-h-screen bg-background font-sans antialiased",
+                fontSans.variable,
+                fontHeading.variable,
+                fontMono.variable
+            )}>
                 <AuthProvider>
                     <AuthRedirector>
                         {children}

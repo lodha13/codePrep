@@ -6,7 +6,7 @@ import { Quiz, Question, QuestionResult, QuizResult, MCQQuestion, CodingQuestion
 import { Button } from "@/components/ui/button";
 import MCQView from "./MCQView";
 import CodingView from "./CodingView";
-import { doc, setDoc, Timestamp, writeBatch, arrayUnion } from "firebase/firestore";
+import { doc, Timestamp, writeBatch, arrayUnion } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
@@ -85,9 +85,9 @@ export default function QuizRunner({ quiz, questions }: QuizRunnerProps) {
         const { score, results } = calculateScore();
         const resultId = `${quiz.id}_${user.uid}_${Date.now()}`;
 
-        const resultData: QuizResult = {
-            id: resultId,
+        const resultData: Omit<QuizResult, 'id'> = {
             quizId: quiz.id,
+            quizTitle: quiz.title, // Denormalize quiz title for faster reads on profile page
             userId: user.uid,
             startedAt: Timestamp.now(), // This should be set when the quiz actually starts
             completedAt: Timestamp.now(),

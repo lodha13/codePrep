@@ -12,7 +12,8 @@ import {
     TableHeader,
     TableRow,
 } from "@/components/ui/table";
-import { PlusCircle } from "lucide-react";
+import { PlusCircle, UserPlus } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 
 export default async function AdminQuizzesPage() {
     const quizzes = await getQuizzes();
@@ -43,7 +44,7 @@ export default async function AdminQuizzesPage() {
                                 <TableHead>Title</TableHead>
                                 <TableHead>Category</TableHead>
                                 <TableHead>Questions</TableHead>
-                                <TableHead>Public</TableHead>
+                                <TableHead>Visibility</TableHead>
                                 <TableHead>Actions</TableHead>
                             </TableRow>
                         </TableHeader>
@@ -53,10 +54,18 @@ export default async function AdminQuizzesPage() {
                                     <TableCell className="font-medium">{quiz.title}</TableCell>
                                     <TableCell>{quiz.category}</TableCell>
                                     <TableCell>{quiz.questionIds.length}</TableCell>
-                                    <TableCell>{quiz.isPublic ? "Yes" : "No"}</TableCell>
                                     <TableCell>
+                                        <Badge variant={quiz.isPublic ? "default" : "secondary"}>
+                                            {quiz.isPublic ? "Public" : "Private"}
+                                        </Badge>
+                                    </TableCell>
+                                    <TableCell className="space-x-2">
                                         <Button variant="outline" size="sm">
                                             Edit
+                                        </Button>
+                                        <Button variant="outline" size="sm">
+                                            <UserPlus className="mr-2 h-4 w-4" />
+                                            Assign
                                         </Button>
                                     </TableCell>
                                 </TableRow>

@@ -18,6 +18,20 @@
         "name": {
           "type": "string",
           "description": "User's full name."
+        },
+        "completedQuizIds": {
+          "type": "array",
+          "description": "An array of quiz IDs that the user has completed.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "assignedQuizIds": {
+            "type": "array",
+            "description": "An array of quiz IDs assigned to the user by an admin.",
+            "items": {
+                "type": "string"
+            }
         }
       },
       "required": [

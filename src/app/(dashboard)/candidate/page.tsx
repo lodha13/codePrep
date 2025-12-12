@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { collection, getDocs, query, where } from "firebase/firestore";
+import { useEffect, useState, useMemo } from "react";
+import { collection, getDocs, query, where, documentId } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { Quiz } from "@/types/schema";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -25,16 +25,29 @@ export default function CandidateDashboard() {
 
             setLoading(true);
 
-            // Fetch all public quizzes
-            const quizzesQuery = query(collection(db, "quizzes"), where("isPublic", "==", true));
-            const quizzesSnapshot = await getDocs(quizzesQuery);
-            const allPublicQuizzes = quizzesSnapshot.docs.map(d => ({ id: d.id, ...d.data() } as Quiz));
-            
-            // Use the completedQuizIds from the user object in context
             const completedQuizIds = user.completedQuizIds || [];
+            const assignedQuizIds = user.assignedQuizIds || [];
+
+            // 1. Fetch all public quizzes
+            const publicQuizzesQuery = query(collection(db, "quizzes"), where("isPublic", "==", true));
+            const publicQuizzesSnap = await getDocs(publicQuizzesQuery);
+            const publicQuizzes = publicQuizzesSnap.docs.map(d => ({ id: d.id, ...d.data() } as Quiz));
+
+            // 2. Fetch assigned quizzes (if any)
+            let assignedQuizzes: Quiz[] = [];
+            if (assignedQuizIds.length > 0) {
+                 const assignedQuizzesQuery = query(collection(db, "quizzes"), where(documentId(), "in", assignedQuizIds));
+                 const assignedQuizzesSnap = await getDocs(assignedQuizzesQuery);
+                 assignedQuizzes = assignedQuizzesSnap.docs.map(d => ({ id: d.id, ...d.data() } as Quiz));
+            }
+
+            // 3. Combine and deduplicate
+            const allVisibleQuizzes = new Map<string, Quiz>();
+            publicQuizzes.forEach(q => allVisibleQuizzes.set(q.id, q));
+            assignedQuizzes.forEach(q => allVisibleQuizzes.set(q.id, q));
             
-            // Filter out the quizzes that have already been completed
-            const availableQuizzes = allPublicQuizzes.filter(quiz => !completedQuizIds.includes(quiz.id));
+            // 4. Filter out completed quizzes
+            const availableQuizzes = Array.from(allVisibleQuizzes.values()).filter(quiz => !completedQuizIds.includes(quiz.id));
 
             setQuizzes(availableQuizzes);
             setLoading(false);

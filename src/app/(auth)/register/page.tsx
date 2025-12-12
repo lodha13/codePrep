@@ -46,6 +46,7 @@ export default function RegisterPage() {
                 role: "candidate", // Default role
                 createdAt: new Date(),
                 completedQuizIds: [], // Initialize empty array
+                assignedQuizIds: [], // Initialize empty array
             };
 
             await setDoc(doc(db, "users", user.uid), newUser);
