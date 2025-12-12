@@ -3,7 +3,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import { doc, getDoc, getDocs, collection, query, where, documentId } from "firebase/firestore";
+import { doc, getDoc, getDocs, collection, query, where, documentId, limit } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { Quiz, Question } from "@/types/schema";
 import QuizRunner from "@/components/quiz/QuizRunner";
@@ -22,10 +22,19 @@ export default function QuizPage() {
 
     useEffect(() => {
         const fetchData = async () => {
-            if (!id || authLoading) return;
+            if (!id || !user || authLoading) return;
 
-            // Check if user has already completed this quiz
-            if (user && user.completedQuizIds?.includes(id as string)) {
+            // More reliable check: Query the results collection to see if this user has
+            // already submitted a result for this quiz.
+            const resultsQuery = query(
+                collection(db, "results"), 
+                where("userId", "==", user.uid), 
+                where("quizId", "==", id as string),
+                limit(1) // We only need to know if at least one exists
+            );
+            const resultsSnapshot = await getDocs(resultsQuery);
+
+            if (!resultsSnapshot.empty) {
                 setAlreadyAttempted(true);
                 setLoading(false);
                 return;
@@ -51,7 +60,9 @@ export default function QuizPage() {
             setLoading(false);
         };
 
-        fetchData();
+        if (user) {
+          fetchData();
+        }
     }, [id, user, authLoading]);
 
     if (loading || authLoading) return <div className="p-8 text-center">Loading Quiz...</div>;
