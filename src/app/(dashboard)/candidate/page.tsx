@@ -27,6 +27,8 @@ export default function CandidateDashboard() {
 
             const completedQuizIds = user.completedQuizIds || [];
             const assignedQuizIds = user.assignedQuizIds || [];
+            
+            const quizIdsToFetch = [...new Set(assignedQuizIds)];
 
             // 1. Fetch all public quizzes
             const publicQuizzesQuery = query(collection(db, "quizzes"), where("isPublic", "==", true));
