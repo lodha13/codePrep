@@ -1,11 +1,12 @@
+
 "use client";
 
 import { useState } from "react";
 import { createUserWithEmailAndPassword } from "firebase/auth";
 import { auth, db } from "@/lib/firebase";
 import { useRouter } from "next/navigation";
-import { doc, setDoc, Timestamp } from "firebase/firestore";
-import { User, UserRole } from "@/types/schema";
+import { doc, setDoc } from "firebase/firestore";
+import { User } from "@/types/schema";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -43,7 +44,8 @@ export default function RegisterPage() {
                 email: user.email!,
                 displayName: name,
                 role: "candidate", // Default role
-                createdAt: Timestamp.now(),
+                createdAt: new Date(),
+                completedQuizIds: [], // Initialize empty array
             };
 
             await setDoc(doc(db, "users", user.uid), newUser);
@@ -53,7 +55,8 @@ export default function RegisterPage() {
                 description: "You have been successfully registered.",
             });
 
-            router.push("/");
+            // The AuthRedirector will handle redirection automatically.
+            // No need for router.push()
         } catch (err: any) {
             if (err.code === 'auth/email-already-in-use') {
                 setError("This email address is already in use.");

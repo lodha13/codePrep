@@ -8,6 +8,7 @@ export interface User {
     displayName?: string;
     role: UserRole;
     createdAt: Date; // Changed to Date for consistency
+    completedQuizIds?: string[];
 }
 
 export interface Quiz {
@@ -22,6 +23,7 @@ export interface Quiz {
     createdBy: string; // User ID
     createdAt: Date;
     isPublic: boolean;
+    difficulty?: "easy" | "medium" | "hard";
 }
 
 export type QuestionType = "mcq" | "coding";

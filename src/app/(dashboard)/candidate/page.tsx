@@ -4,12 +4,12 @@
 import { useEffect, useState } from "react";
 import { collection, getDocs, query, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { Quiz, QuizResult } from "@/types/schema";
+import { Quiz } from "@/types/schema";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
-import { LogOut, Search, Code, Check, CheckSquare, Square } from "lucide-react";
+import { LogOut, Search, Code, CheckSquare, Square } from "lucide-react";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -36,17 +36,15 @@ export default function CandidateDashboard() {
 
             setLoading(true);
 
-            // 1. Fetch the user's results first to identify completed quizzes
-            const resultsRef = collection(db, "users", user.uid, "results");
-            const resultsSnapshot = await getDocs(resultsRef);
-            const completedQuizIds = resultsSnapshot.docs.map(doc => (doc.data() as QuizResult).quizId);
-
-            // 2. Fetch all public quizzes
+            // Fetch all public quizzes
             const quizzesQuery = query(collection(db, "quizzes"), where("isPublic", "==", true));
             const quizzesSnapshot = await getDocs(quizzesQuery);
             const allPublicQuizzes = quizzesSnapshot.docs.map(d => ({ id: d.id, ...d.data() } as Quiz));
-
-            // 3. Filter out the quizzes that have already been completed
+            
+            // Use the completedQuizIds from the user object in context
+            const completedQuizIds = user.completedQuizIds || [];
+            
+            // Filter out the quizzes that have already been completed
             const availableQuizzes = allPublicQuizzes.filter(quiz => !completedQuizIds.includes(quiz.id));
 
             setQuizzes(availableQuizzes);
@@ -189,12 +187,3 @@ export default function CandidateDashboard() {
         </div>
     );
 }
-
-// Add a Checkbox-like component for the filter UI, as it's not a standard shadcn component
-const Checkbox = ({ checked }: { checked: boolean }) => {
-    return (
-        <div className={`h-4 w-4 border rounded-sm flex items-center justify-center ${checked ? 'bg-primary border-primary' : 'bg-white'}`}>
-            {checked && <Check className="h-3 w-3 text-white" />}
-        </div>
-    );
-};

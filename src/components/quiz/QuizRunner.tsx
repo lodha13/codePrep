@@ -6,7 +6,7 @@ import { Quiz, Question, QuestionResult, QuizResult, MCQQuestion, CodingQuestion
 import { Button } from "@/components/ui/button";
 import MCQView from "./MCQView";
 import CodingView from "./CodingView";
-import { doc, setDoc, Timestamp } from "firebase/firestore";
+import { doc, setDoc, Timestamp, writeBatch, arrayUnion } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
@@ -97,15 +97,19 @@ export default function QuizRunner({ quiz, questions }: QuizRunnerProps) {
             answers: results,
         };
 
-        // Save the result to the user-specific collection for scalable reads
-        const resultDocRef = doc(db, "users", user.uid, "results", resultId);
-        await setDoc(resultDocRef, resultData);
+        const batch = writeBatch(db);
 
-        // Also save to the top-level results collection for simplified result page lookup
-        // This is a denormalization strategy.
+        // 1. Save the detailed result to the top-level results collection
         const topLevelResultDocRef = doc(db, "results", resultId);
-        await setDoc(topLevelResultDocRef, resultData);
+        batch.set(topLevelResultDocRef, resultData);
+        
+        // 2. Update the user's document with the completed quiz ID
+        const userDocRef = doc(db, "users", user.uid);
+        batch.update(userDocRef, {
+            completedQuizIds: arrayUnion(quiz.id)
+        });
 
+        await batch.commit();
 
         router.push(`/results/${resultId}`);
     };
