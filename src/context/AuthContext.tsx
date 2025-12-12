@@ -54,7 +54,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
             setFirebaseUser(fbUser);
             if (fbUser) {
-                // Set a session cookie to be used by the middleware
                 setCookie('__session', 'true', 1);
 
                 const userDocRef = doc(db, "users", fbUser.uid);
@@ -62,7 +61,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 let appUser: User | null = null;
                 if (userDoc.exists()) {
                     appUser = userDoc.data() as User;
-                    setUser(appUser);
                 } else {
                     const newUser: User = {
                         uid: fbUser.uid,
@@ -73,10 +71,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     };
                     await setDoc(userDocRef, newUser);
                     appUser = newUser;
-                    setUser(newUser);
                 }
+                setUser(appUser);
                 
-                // Re-introduce client-side role-based redirection AFTER login
+                // Client-side redirect after login
                 const isAuthRoute = pathname === '/login' || pathname === '/register';
                 if (isAuthRoute) {
                     if (appUser?.role === 'admin') {
@@ -85,9 +83,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                         router.push('/candidate');
                     }
                 }
-
             } else {
-                // User is signed out, clear the session cookie
                 eraseCookie('__session');
                 setUser(null);
             }
@@ -95,7 +91,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         });
 
         return () => unsubscribe();
-    }, [pathname, router]);
+    // The dependency array is intentionally empty to only run this on mount.
+    // The router and pathname are available within the callback's scope.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     const signOut = async () => {
         await firebaseSignOut(auth);
