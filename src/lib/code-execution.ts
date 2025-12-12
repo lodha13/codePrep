@@ -57,10 +57,16 @@ export async function executeCode(
             source_code: Buffer.from(source_code).toString('base64'),
             language_id: language_id,
         };
+        
+        const judge0Host = 'judge0.p.rapidapi.com';
 
         const compileResponse = await fetch(`https://judge0-ce.p.rapidapi.com/submissions?base64_encoded=true&wait=true`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 
+                'Content-Type': 'application/json',
+                'X-RapidAPI-Key': process.env.NEXT_PUBLIC_RAPIDAPI_KEY!,
+                'X-RapidAPI-Host': 'judge0-ce.p.rapidapi.com'
+            },
             body: JSON.stringify(compileCheckPayload),
         });
         
@@ -104,7 +110,11 @@ export async function executeCode(
             submissionPayloads.map(payload =>
                 fetch(`https://judge0-ce.p.rapidapi.com/submissions?base64_encoded=true&wait=true`, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'X-RapidAPI-Key': process.env.NEXT_PUBLIC_RAPIDAPI_KEY!,
+                        'X-RapidAPI-Host': 'judge0-ce.p.rapidapi.com'
+                    },
                     body: JSON.stringify(payload),
                 }).then(res => {
                     if (!res.ok) {
@@ -140,6 +150,9 @@ export async function executeCode(
                  actualOutput = result.status.description;
                  if(result.stderr) {
                     actualOutput += `\n${decode(result.stderr)}`
+                 }
+                 if(result.compile_output) {
+                     actualOutput += `\n${decode(result.compile_output)}`
                  }
             } else {
                 actualOutput = "Unknown error";
