@@ -64,6 +64,7 @@ export default function QuizRunner({ quiz, questions }: QuizRunnerProps) {
             let questionScore = 0;
             let questionMaxScore = 0;
             let status: "correct" | "incorrect" | "partial" = "incorrect";
+            let testCaseResults: QuestionResult['testCaseResults'] = undefined;
 
             if (q.type === 'mcq') {
                 const mcq = q as MCQQuestion;
@@ -80,6 +81,7 @@ export default function QuizRunner({ quiz, questions }: QuizRunnerProps) {
                 
                 questionScore = executionResult.passed_tests || 0;
                 questionMaxScore = executionResult.total_tests || codingQ.testCases.length;
+                testCaseResults = executionResult.test_case_results;
                 
                 if (questionScore === questionMaxScore) {
                     status = 'correct';
@@ -98,6 +100,7 @@ export default function QuizRunner({ quiz, questions }: QuizRunnerProps) {
                 score: questionScore,
                 total: questionMaxScore,
                 userAnswer: userAnswer || "",
+                testCaseResults: testCaseResults,
             };
         }
         return { score: totalQuizScore, totalScore: maxQuizScore, results };
@@ -195,7 +198,7 @@ export default function QuizRunner({ quiz, questions }: QuizRunnerProps) {
                     </div>
                 </div>
                  <div className="p-4 border-t">
-                    <Button onClick={handleSubmit} disabled={submitting} className="w-full">
+                     <Button onClick={handleSubmit} disabled={submitting} className="w-full">
                         {submitting ? "Submitting..." : "Submit Quiz"}
                     </Button>
                 </div>

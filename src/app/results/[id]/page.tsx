@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { doc, getDoc, collection, getDocs, query, where, documentId } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { QuizResult, Question, Quiz, QuestionResult, CodingQuestion } from "@/types/schema";
+import { QuizResult, Question, Quiz, QuestionResult, CodingQuestion, TestCaseResult } from "@/types/schema";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
@@ -88,6 +88,30 @@ export default function ResultPage() {
                 return null;
         }
     }
+    
+    const renderTestCaseResults = (testCaseResults: TestCaseResult[]) => (
+        <div className="mt-4 space-y-3">
+             <h4 className="text-sm font-semibold text-muted-foreground">Test Case Breakdown:</h4>
+            {testCaseResults.map((tc, index) => (
+                <Card key={index} className="bg-secondary/50 p-3 text-xs">
+                    <div className="flex items-center justify-between mb-2">
+                         <div className="flex items-center gap-2">
+                             {tc.passed ? <CheckCircle className="h-4 w-4 text-green-500"/> : <XCircle className="h-4 w-4 text-red-500"/>}
+                            <span className="font-semibold">Test Case {index + 1}</span>
+                         </div>
+                        <Badge variant={tc.passed ? 'default' : 'destructive'} className={cn(tc.passed ? "bg-green-100 text-green-800 border-green-300" : "bg-red-100 text-red-800 border-red-300")}>
+                            {tc.passed ? 'Passed' : 'Failed'}
+                        </Badge>
+                    </div>
+                    <div className="font-mono bg-background p-2 rounded-md space-y-1">
+                        <p><span className="font-semibold">Input:</span> {tc.input}</p>
+                        <p><span className="font-semibold">Expected:</span> {tc.expected}</p>
+                        <p><span className="font-semibold">Got:</span> {tc.actual}</p>
+                    </div>
+                </Card>
+            ))}
+        </div>
+    );
 
     return (
         <div className="max-w-4xl mx-auto p-4 md:p-8 space-y-8">
@@ -133,6 +157,8 @@ export default function ResultPage() {
                              ) : (
                                 <p className="font-mono bg-gray-100 p-2 rounded text-sm inline-block mt-1">{ans.userAnswer || "No Answer"}</p>
                              )}
+                             
+                             {ans.questionType === 'coding' && ans.testCaseResults && renderTestCaseResults(ans.testCaseResults)}
                         </div>
                     </Card>
                 ))}

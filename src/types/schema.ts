@@ -64,6 +64,14 @@ export interface CodingQuestion extends BaseQuestion {
 
 export type Question = MCQQuestion | CodingQuestion;
 
+// This mirrors the TestCaseResult in code-execution.ts
+export interface TestCaseResult {
+    input: string;
+    expected: string;
+    actual: string;
+    passed: boolean;
+}
+
 export interface QuestionResult {
     questionId: string;
     timeTakenSeconds: number;
@@ -71,7 +79,7 @@ export interface QuestionResult {
     score: number;
     total: number; // The maximum possible score for this question.
     userAnswer?: string | number; // Index for MCQ, Code for Coding
-    output?: string; // For coding questions
+    testCaseResults?: TestCaseResult[]; // For coding questions
 }
 
 export interface QuizResult {
