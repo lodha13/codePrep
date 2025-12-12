@@ -97,13 +97,15 @@ export default function QuizRunner({ quiz, questions }: QuizRunnerProps) {
             answers: results,
         };
 
-        // Save the result to the user-specific collection
+        // Save the result to the user-specific collection for scalable reads
         const resultDocRef = doc(db, "users", user.uid, "results", resultId);
         await setDoc(resultDocRef, resultData);
 
-        // Also save to the top-level results collection for the results page to work
-        // This is denormalization.
-        await setDoc(doc(db, "results", resultId), resultData);
+        // Also save to the top-level results collection for simplified result page lookup
+        // This is a denormalization strategy.
+        const topLevelResultDocRef = doc(db, "results", resultId);
+        await setDoc(topLevelResultDocRef, resultData);
+
 
         router.push(`/results/${resultId}`);
     };

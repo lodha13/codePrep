@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useEffect, useState } from "react";
@@ -35,7 +36,7 @@ export default function CandidateDashboard() {
 
             setLoading(true);
 
-            // 1. Fetch the user's results first
+            // 1. Fetch the user's results first to identify completed quizzes
             const resultsRef = collection(db, "users", user.uid, "results");
             const resultsSnapshot = await getDocs(resultsRef);
             const completedQuizIds = resultsSnapshot.docs.map(doc => (doc.data() as QuizResult).quizId);
@@ -45,14 +46,16 @@ export default function CandidateDashboard() {
             const quizzesSnapshot = await getDocs(quizzesQuery);
             const allPublicQuizzes = quizzesSnapshot.docs.map(d => ({ id: d.id, ...d.data() } as Quiz));
 
-            // 3. Filter out the completed quizzes
+            // 3. Filter out the quizzes that have already been completed
             const availableQuizzes = allPublicQuizzes.filter(quiz => !completedQuizIds.includes(quiz.id));
 
             setQuizzes(availableQuizzes);
             setLoading(false);
         };
 
-        fetchQuizzes();
+        if (user) {
+            fetchQuizzes();
+        }
     }, [user]);
 
     const getInitials = (name?: string) => {
