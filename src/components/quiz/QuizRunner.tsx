@@ -80,6 +80,19 @@ export default function QuizRunner({ quiz, questions }: QuizRunnerProps) {
 
     const handleSubmit = async () => {
         if (!user) return;
+        
+        const answeredQuestionsCount = Object.keys(answers).length;
+        const totalQuestionsCount = questions.length;
+
+        if (answeredQuestionsCount < totalQuestionsCount) {
+            const confirmed = window.confirm(
+                `You have only answered ${answeredQuestionsCount} out of ${totalQuestionsCount} questions. Are you sure you want to submit?`
+            );
+            if (!confirmed) {
+                return; // Abort submission
+            }
+        }
+
         setSubmitting(true);
 
         const { score, results } = calculateScore();
