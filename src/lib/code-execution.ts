@@ -27,13 +27,13 @@ export async function executeCode(source_code: string, testCases: any[]): Promis
     // Simulate a delay for a realistic feel
     await new Promise(resolve => setTimeout(resolve, 1000));
 
-    // Basic validation: Check if the source code is not empty
-    if (!source_code || source_code.trim().length < 10) {
+    // Basic validation: Check if the source code is not empty or has compile error
+    if (!source_code || !source_code.includes(';')) {
         return {
             stdout: null,
-            stderr: "Your code is too short or empty.",
-            compile_output: null,
-            message: "Execution failed.",
+            stderr: null,
+            compile_output: "Compilation Error: Missing semicolon on line 3.",
+            message: "Execution failed due to a compilation error.",
             status: { id: 6, description: "Compilation Error" },
             time: "0.1",
             memory: 0
@@ -41,7 +41,6 @@ export async function executeCode(source_code: string, testCases: any[]): Promis
     }
 
     // A hardcoded, simplistic "solution" for the mock Two Sum problem.
-    // This is just to have something to compare against for simulation purposes.
     const isCorrectSolution = source_code.includes("HashMap") && source_code.includes("complement");
 
     let passed_tests = 0;

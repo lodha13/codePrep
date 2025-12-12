@@ -55,11 +55,11 @@ export default function CodingView({ question, onCodeChange, currentCode }: Codi
         if (!executionResult) {
             return "Run code to see output...";
         }
+        if (executionResult.compile_output) {
+            return <span className="text-red-500">{executionResult.compile_output}</span>;
+        }
         if (executionResult.stderr) {
             return <span className="text-red-500">{executionResult.stderr}</span>;
-        }
-         if (executionResult.compile_output) {
-            return <span className="text-red-500">{executionResult.compile_output}</span>;
         }
         if (!executionResult.test_case_results) {
             return "No test case results available.";
