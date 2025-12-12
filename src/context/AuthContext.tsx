@@ -32,11 +32,15 @@ function setCookie(name: string, value: string, days: number) {
         date.setTime(date.getTime() + (days*24*60*60*1000));
         expires = "; expires=" + date.toUTCString();
     }
-    document.cookie = name + "=" + (value || "")  + expires + "; path=/";
+    if (typeof document !== 'undefined') {
+        document.cookie = name + "=" + (value || "")  + expires + "; path=/";
+    }
 }
 
 function eraseCookie(name: string) {   
-    document.cookie = name+'=; Max-Age=-99999999;';  
+    if (typeof document !== 'undefined') {
+        document.cookie = name+'=; Max-Age=-99999999;';  
+    }
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -51,7 +55,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             setFirebaseUser(fbUser);
             if (fbUser) {
                 // Set a session cookie to be used by the middleware
-                setCookie('__session', 'true', 1); // Expires in 1 day
+                setCookie('__session', 'true', 1);
 
                 const userDocRef = doc(db, "users", fbUser.uid);
                 const userDoc = await getDoc(userDocRef);
@@ -72,12 +76,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     setUser(newUser);
                 }
                 
-                // Client-side role-based redirection
-                const isAdminRoute = pathname.startsWith('/admin');
-                if (appUser?.role === 'admin' && !isAdminRoute) {
-                    router.push('/admin');
-                } else if (appUser?.role === 'candidate' && (isAdminRoute || pathname === '/admin')) {
-                    router.push('/candidate');
+                // Re-introduce client-side role-based redirection AFTER login
+                const isAuthRoute = pathname === '/login' || pathname === '/register';
+                if (isAuthRoute) {
+                    if (appUser?.role === 'admin') {
+                        router.push('/admin');
+                    } else {
+                        router.push('/candidate');
+                    }
                 }
 
             } else {
