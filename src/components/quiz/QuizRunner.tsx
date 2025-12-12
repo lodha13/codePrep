@@ -12,6 +12,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
 import { Flag, ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { executeCode } from "@/lib/code-execution";
 
 interface QuizRunnerProps {
     quiz: Quiz;
@@ -53,33 +54,51 @@ export default function QuizRunner({ quiz, questions }: QuizRunnerProps) {
         setFlagged(prev => ({ ...prev, [currentQuestion.id]: !prev[currentQuestion.id] }));
     };
 
-    const calculateScore = () => {
-        let score = 0;
+    const calculateScore = async () => {
+        let totalQuizScore = 0;
+        let maxQuizScore = 0;
         const results: Record<string, QuestionResult> = {};
 
-        questions.forEach(q => {
-            const ans = answers[q.id];
-            let isCorrect = false;
+        for (const q of questions) {
+            const userAnswer = answers[q.id];
+            let questionScore = 0;
+            let questionMaxScore = 0;
+            let status: "correct" | "incorrect" | "partial" = "incorrect";
 
             if (q.type === 'mcq') {
-                isCorrect = ans === (q as MCQQuestion).correctOptionIndex.toString();
+                const mcq = q as MCQQuestion;
+                questionMaxScore = 10; // Fixed score for MCQs
+                const isCorrect = userAnswer === mcq.correctOptionIndex.toString();
+                if (isCorrect) {
+                    questionScore = 10;
+                    status = 'correct';
+                }
             } else if (q.type === 'coding') {
                 const codingQ = q as CodingQuestion;
-                 // Simple check: compare submitted code to solution, ignoring whitespace.
-                isCorrect = !!ans && !!codingQ.solutionCode && ans.replace(/\s/g, '') === codingQ.solutionCode.replace(/\s/g, '');
+                questionMaxScore = codingQ.testCases.length;
+                const executionResult = await executeCode(userAnswer, codingQ.solutionCode, codingQ.testCases);
+                questionScore = executionResult.passed_tests || 0;
+                
+                if (questionScore === questionMaxScore) {
+                    status = 'correct';
+                } else if (questionScore > 0) {
+                    status = 'partial';
+                }
             }
-
-            if (isCorrect) score += 10; // Award 10 points per correct question
+            
+            totalQuizScore += questionScore;
+            maxQuizScore += questionMaxScore;
 
             results[q.id] = {
                 questionId: q.id,
-                timeTakenSeconds: 0,
-                status: isCorrect ? 'correct' : 'incorrect',
-                score: isCorrect ? 10 : 0,
-                userAnswer: ans || "", // Fix: Default to empty string if undefined
+                timeTakenSeconds: 0, // Placeholder
+                status,
+                score: questionScore,
+                total: questionMaxScore,
+                userAnswer: userAnswer || "",
             };
-        });
-        return { score, results };
+        }
+        return { score: totalQuizScore, totalScore: maxQuizScore, results };
     };
 
     const handleSubmit = async () => {
@@ -90,7 +109,7 @@ export default function QuizRunner({ quiz, questions }: QuizRunnerProps) {
 
         if (answeredQuestionsCount < totalQuestionsCount) {
             const confirmed = window.confirm(
-                `You have only answered ${answeredQuestionsCount} out of ${totalQuestionsCount} questions. Are you sure you want to submit?`
+                `You have only answered ${answeredQuestions_count} out of ${totalQuestionsCount} questions. Are you sure you want to submit?`
             );
             if (!confirmed) {
                 return; // Abort submission
@@ -99,7 +118,7 @@ export default function QuizRunner({ quiz, questions }: QuizRunnerProps) {
 
         setSubmitting(true);
 
-        const { score, results } = calculateScore();
+        const { score, totalScore, results } = await calculateScore();
         const resultId = `${quiz.id}_${user.uid}_${Date.now()}`;
 
         const resultData: Omit<QuizResult, 'id'> = {
@@ -109,7 +128,7 @@ export default function QuizRunner({ quiz, questions }: QuizRunnerProps) {
             startedAt: Timestamp.now(), // This should be set when the quiz actually starts
             completedAt: Timestamp.now(),
             score,
-            totalScore: questions.length * 10,
+            totalScore,
             status: "completed",
             answers: results,
         };

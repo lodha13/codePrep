@@ -69,6 +69,7 @@ export interface QuestionResult {
     timeTakenSeconds: number;
     status: "correct" | "incorrect" | "partial";
     score: number;
+    total: number; // The maximum possible score for this question.
     userAnswer?: string | number; // Index for MCQ, Code for Coding
     output?: string; // For coding questions
 }

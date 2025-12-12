@@ -5,14 +5,14 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { doc, getDoc, collection, getDocs, query, where, documentId } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { QuizResult, Question, Quiz } from "@/types/schema";
+import { QuizResult, Question, Quiz, QuestionResult } from "@/types/schema";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import { CheckCircle, XCircle, ChevronRight } from "lucide-react";
+import { CheckCircle, XCircle, ChevronRight, AlertCircle } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 
-type HydratedAnswer = QuizResult['answers'][string] & {
+type HydratedAnswer = QuestionResult & {
     questionTitle?: string;
 };
 
@@ -67,12 +67,25 @@ export default function ResultPage() {
     if (loading) return <div className="p-8 text-center">Loading Result...</div>;
     if (!result) return <div className="p-8 text-center">Result not found or you don't have permission to view it.</div>;
 
-    const percentage = Math.round((result.score / result.totalScore) * 100);
+    const percentage = result.totalScore > 0 ? Math.round((result.score / result.totalScore) * 100) : 0;
 
     const hydratedAnswers: HydratedAnswer[] = Object.values(result.answers).map(ans => ({
         ...ans,
         questionTitle: questions[ans.questionId]?.title || 'Unknown Question'
     }));
+    
+    const getStatusIcon = (status: 'correct' | 'incorrect' | 'partial') => {
+        switch (status) {
+            case 'correct':
+                return <CheckCircle className="text-green-500 h-6 w-6 flex-shrink-0" />;
+            case 'incorrect':
+                return <XCircle className="text-red-500 h-6 w-6 flex-shrink-0" />;
+            case 'partial':
+                return <AlertCircle className="text-yellow-500 h-6 w-6 flex-shrink-0" />;
+            default:
+                return null;
+        }
+    }
 
     return (
         <div className="max-w-4xl mx-auto p-4 md:p-8 space-y-8">
@@ -101,17 +114,14 @@ export default function ResultPage() {
                 {hydratedAnswers.map((ans, idx) => (
                     <Card key={idx} className="flex justify-between items-center p-4">
                         <div className="flex items-center gap-4">
-                            {ans.status === 'correct' ? 
-                                <CheckCircle className="text-green-500 h-6 w-6 flex-shrink-0" /> : 
-                                <XCircle className="text-red-500 h-6 w-6 flex-shrink-0" />
-                            }
+                            {getStatusIcon(ans.status)}
                             <div>
                                 <p className="font-semibold">{ans.questionTitle}</p>
                                 <p className="text-xs text-muted-foreground mt-1">Your answer: <span className="font-mono bg-gray-100 p-1 rounded text-xs">{ans.userAnswer || "No Answer"}</span></p>
                             </div>
                         </div>
                         <div className="font-bold text-lg">
-                            {ans.score} pts
+                            {ans.score} / {ans.total} pts
                         </div>
                     </Card>
                 ))}
