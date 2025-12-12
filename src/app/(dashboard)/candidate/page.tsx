@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useEffect, useState } from "react";
@@ -9,7 +8,7 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription }
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
-import { LogOut, Search, Code, CheckSquare, Square } from "lucide-react";
+import { LogOut, Search, Code, CheckSquare, Square, User as UserIcon } from "lucide-react";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -70,7 +69,7 @@ export default function CandidateDashboard() {
                         CodePrep Pro
                     </Link>
                     <nav className="hidden md:flex items-center gap-6 text-sm font-medium">
-                        <Link href="#" className="text-foreground transition-colors hover:text-foreground/80">Prepare</Link>
+                        <Link href="/candidate" className="text-foreground transition-colors hover:text-foreground/80">Prepare</Link>
                         <Link href="#" className="text-muted-foreground transition-colors hover:text-foreground/80">Certify</Link>
                         <Link href="#" className="text-muted-foreground transition-colors hover:text-foreground/80">Compete</Link>
                     </nav>
@@ -96,6 +95,12 @@ export default function CandidateDashboard() {
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
                             <DropdownMenuLabel>{user?.displayName || "My Account"}</DropdownMenuLabel>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem asChild>
+                               <Link href="/candidate/profile">
+                                    <UserIcon className="mr-2 h-4 w-4" /> View Profile
+                                </Link>
+                            </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem onClick={() => signOut()}>
                                 <LogOut className="mr-2 h-4 w-4" /> Logout
