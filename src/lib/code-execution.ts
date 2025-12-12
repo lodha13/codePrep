@@ -22,6 +22,7 @@ export interface ExecutionResult {
 }
 
 // This mock function simulates running code against a set of test cases.
+// It's enhanced to recognize patterns for different problems.
 export async function executeCode(source_code: string, testCases: any[]): Promise<ExecutionResult> {
 
     // Simulate a delay for a realistic feel
@@ -46,9 +47,7 @@ export async function executeCode(source_code: string, testCases: any[]): Promis
     const returnMatch = source_code.match(/return\s+([a-zA-Z0-9_]+);/);
     if (returnMatch) {
         const returnedVar = returnMatch[1];
-        // Check if the returned variable is one of the parameters or a known "correct" variable.
-        // This is a simplistic check for simulation purposes.
-        if (returnedVar !== 'nums' && returnedVar !== 'target' && !source_code.includes(` ${returnedVar};`) && !source_code.includes(` ${returnedVar} `)) {
+        if (returnedVar !== 'nums' && returnedVar !== 'target' && !source_code.includes(` ${returnedVar};`) && !source_code.includes(` ${returnedVar} `) && !source_code.includes(`(${returnedVar})`)) {
              return {
                 stdout: null,
                 stderr: null,
@@ -64,17 +63,35 @@ export async function executeCode(source_code: string, testCases: any[]): Promis
 
     // --- 2. Simulate Execution Step ---
 
-    // A hardcoded, simplistic "solution" for the mock Two Sum problem.
-    const isCorrectSolution = source_code.includes("HashMap") && source_code.includes("complement");
+    // Determine the problem type based on source code and test cases
+    const isTwoSumProblem = source_code.includes("twoSum");
+    const isReverseStringProblem = source_code.includes("reverse");
+
+    let isCorrectSolution = false;
+    if (isTwoSumProblem) {
+        isCorrectSolution = source_code.includes("HashMap") && source_code.includes("complement");
+    } else if (isReverseStringProblem) {
+        isCorrectSolution = source_code.includes("new StringBuilder") && source_code.includes(".reverse()");
+    }
+
 
     let passed_tests = 0;
     const test_case_results: TestCaseResult[] = [];
 
     for (const tc of testCases) {
-        // In a real scenario, you'd execute the code with tc.input
-        // and compare the result with tc.expectedOutput.
-        // Here, we just simulate it based on whether the "correct" solution is present.
         const passed = isCorrectSolution;
+        let actualOutput = '';
+
+        if (isTwoSumProblem) {
+            actualOutput = passed ? tc.expectedOutput : '[-1, -1]';
+        } else if (isReverseStringProblem) {
+            // Simulate reversing the input string for a more realistic "actual" output
+            const inputMatch = tc.input.match(/"(.*?)"/);
+            const rawInput = inputMatch ? inputMatch[1] : '';
+            actualOutput = passed ? tc.expectedOutput : `Incorrect output for ${rawInput}`;
+        } else {
+            actualOutput = 'Could not determine problem type.';
+        }
         
         if (passed) {
             passed_tests++;
@@ -83,7 +100,7 @@ export async function executeCode(source_code: string, testCases: any[]): Promis
         test_case_results.push({
             input: tc.input,
             expected: tc.expectedOutput,
-            actual: passed ? tc.expectedOutput : '[-1, -1]', // Simulate wrong output if solution is not perfect
+            actual: actualOutput,
             passed: passed,
         });
     }
