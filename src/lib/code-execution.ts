@@ -22,21 +22,13 @@ export interface ExecutionResult {
     total_tests?: number;
 }
 
-// Maps our simple language names to Judge0's language IDs
-// See https://ce.judge0.com/languages
 const LANGUAGE_ID_MAP: Record<CodingQuestion['language'], number> = {
-    java: 91, // Java 17
-    javascript: 93, // Node.js 18.15.0
-    python: 92, // Python 3.11.2
-    cpp: 54, // C++ (GCC 9.2.0)
+    java: 91,
+    javascript: 93,
+    python: 92,
+    cpp: 54,
 };
 
-/**
- * Extracts the input values from the test case string.
- * This is a simplified parser and may need to be made more robust
- * depending on the complexity of the input format.
- * Example: "nums = [2, 7, 11, 15], target = 9" -> "2 7 11 15\n9"
- */
 function parseInput(input: string): string {
     if (!input) return '';
     return input
@@ -47,10 +39,6 @@ function parseInput(input: string): string {
         .replace(/\]/g, '');
 }
 
-/**
- * Executes user-provided code against a set of test cases using the public Judge0 API.
- * This function is designed to be stateless and relies only on its inputs.
- */
 export async function executeCode(
     source_code: string,
     language: CodingQuestion['language'],
@@ -82,7 +70,6 @@ export async function executeCode(
                     body: JSON.stringify(payload),
                 }).then(res => {
                     if (!res.ok) {
-                        // Handle non-2xx responses as an error for this submission
                         return res.json().then(errorBody => Promise.reject(errorBody));
                     }
                     return res.json();
@@ -94,18 +81,16 @@ export async function executeCode(
             if (res.status === 'fulfilled') {
                 return res.value;
             } else {
-                // Handle rejected promises (network errors, non-ok responses)
                 console.error(`Error processing test case ${index}:`, res.reason);
                 return {
-                    status: { id: 13, description: "Internal Error" }, // Judge0's Internal Error status
-                    stderr: `Failed to execute test case ${index + 1}.`,
+                    status: { id: 13, description: "Internal Error" },
+                    stderr: Buffer.from(`Failed to execute test case ${index + 1}.`).toString('base64'),
                     time: "0",
                     memory: 0,
                 };
             }
         });
 
-        // Check for a compilation error in the first result
         const firstResult = results[0];
         if (firstResult?.status?.id === 6) { // 6 is Compilation Error
             return {
@@ -121,15 +106,21 @@ export async function executeCode(
 
         let passed_tests = 0;
         const test_case_results = results.map((result, i) => {
-            const isPass = result?.status?.id === 3; // 3 = Accepted
+            const isPass = result?.status?.id === 3;
             if (isPass) {
                 passed_tests++;
             }
-            const actualOutput = result?.stdout ? Buffer.from(result.stdout, 'base64').toString('utf-8') : (result?.stderr ? Buffer.from(result.stderr, 'base64').toString('utf-8') : "No output");
+
+            let actualOutput = "No output";
+            if (result?.stdout) {
+                actualOutput = Buffer.from(result.stdout, 'base64').toString('utf-8');
+            } else if (result?.stderr) {
+                actualOutput = Buffer.from(result.stderr, 'base64').toString('utf-8');
+            }
             
             return {
                 input: testCases[i].input,
-                expected: testCases[i].expectedOutput || "",
+                expected: testCases[i].expectedOutput?.trim() || "",
                 actual: actualOutput.trim(),
                 passed: isPass,
             };
@@ -139,16 +130,14 @@ export async function executeCode(
         const maxMemory = results.reduce((acc, r) => Math.max(acc, r?.memory || 0), 0);
 
         const finalStatus = results.reduce((currentStatus, r) => {
-            // A more severe error status should take precedence.
             if (!r || !r.status) return { id: 13, description: "Internal Error" };
             return r.status.id > currentStatus.id ? r.status : currentStatus;
         }, { id: 3, description: "Accepted" });
         
         if (passed_tests < testCases.length && finalStatus.id === 3) {
-            finalStatus.id = 4; // If not all passed but no other error occurred, it's a "Wrong Answer"
+            finalStatus.id = 4;
             finalStatus.description = "Wrong Answer";
         }
-
 
         return {
             stdout: null,
