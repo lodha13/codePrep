@@ -58,15 +58,11 @@ export async function executeCode(
             language_id: language_id,
         };
         
-        const judge0Host = 'judge0.p.rapidapi.com';
+        const judge0Endpoint = 'https://ce.judge0.com/submissions?base64_encoded=true&wait=true';
 
-        const compileResponse = await fetch(`https://judge0-ce.p.rapidapi.com/submissions?base64_encoded=true&wait=true`, {
+        const compileResponse = await fetch(judge0Endpoint, {
             method: 'POST',
-            headers: { 
-                'Content-Type': 'application/json',
-                'X-RapidAPI-Key': process.env.NEXT_PUBLIC_RAPIDAPI_KEY!,
-                'X-RapidAPI-Host': 'judge0-ce.p.rapidapi.com'
-            },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(compileCheckPayload),
         });
         
@@ -108,13 +104,9 @@ export async function executeCode(
 
         const responses = await Promise.allSettled(
             submissionPayloads.map(payload =>
-                fetch(`https://judge0-ce.p.rapidapi.com/submissions?base64_encoded=true&wait=true`, {
+                fetch(judge0Endpoint, {
                     method: 'POST',
-                    headers: { 
-                        'Content-Type': 'application/json',
-                        'X-RapidAPI-Key': process.env.NEXT_PUBLIC_RAPIDAPI_KEY!,
-                        'X-RapidAPI-Host': 'judge0-ce.p.rapidapi.com'
-                    },
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload),
                 }).then(res => {
                     if (!res.ok) {
