@@ -24,9 +24,8 @@ export default function LoginPage() {
         setLoading(true);
         try {
             await signInWithEmailAndPassword(auth, email, password);
-            // AuthProvider and AuthRedirector will handle the redirection logic
-            // We just need to push them to a generic page after login.
-            router.push("/");
+            // AuthProvider and AuthRedirector will now handle all redirection logic.
+            // No router.push needed here.
         } catch (err: any) {
             setError("Invalid email or password. Please try again.");
         } finally {
