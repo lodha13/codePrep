@@ -1,9 +1,9 @@
+
 import type { Metadata } from "next";
 import { Inter, Space_Grotesk, Source_Code_Pro } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/context/AuthContext";
 import { Toaster } from "@/components/ui/toaster";
-import AuthRedirector from "@/components/auth/AuthRedirector";
 import { cn } from "@/lib/utils";
 
 const fontSans = Inter({ subsets: ["latin"], variable: "--font-sans" });
@@ -29,9 +29,7 @@ export default function RootLayout({
                 fontMono.variable
             )}>
                 <AuthProvider>
-                    <AuthRedirector>
-                        {children}
-                    </AuthRedirector>
+                    {children}
                 </AuthProvider>
                 <Toaster />
             </body>
