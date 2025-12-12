@@ -1,22 +1,20 @@
+
 "use server";
 
 import Link from "next/link";
-import { getQuizzes } from "../actions";
+import { getQuizzes, getUsers } from "../actions";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from "@/components/ui/table";
-import { PlusCircle, UserPlus } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import { PlusCircle } from "lucide-react";
+import { AssignQuizClient } from './AssignQuizClient';
 
 export default async function AdminQuizzesPage() {
-    const quizzes = await getQuizzes();
+    // Fetch both quizzes and users in parallel
+    const [quizzes, allUsers] = await Promise.all([
+        getQuizzes(),
+        getUsers()
+    ]);
+    
+    const candidates = allUsers.filter(u => u.role === 'candidate');
 
     return (
         <div className="space-y-6">
@@ -32,48 +30,8 @@ export default async function AdminQuizzesPage() {
                     </Link>
                 </Button>
             </div>
-
-            <Card>
-                <CardHeader>
-                    <CardTitle>All Quizzes</CardTitle>
-                </CardHeader>
-                <CardContent>
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead>Title</TableHead>
-                                <TableHead>Category</TableHead>
-                                <TableHead>Questions</TableHead>
-                                <TableHead>Visibility</TableHead>
-                                <TableHead>Actions</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {quizzes.map((quiz) => (
-                                <TableRow key={quiz.id}>
-                                    <TableCell className="font-medium">{quiz.title}</TableCell>
-                                    <TableCell>{quiz.category}</TableCell>
-                                    <TableCell>{quiz.questionIds.length}</TableCell>
-                                    <TableCell>
-                                        <Badge variant={quiz.isPublic ? "default" : "secondary"}>
-                                            {quiz.isPublic ? "Public" : "Private"}
-                                        </Badge>
-                                    </TableCell>
-                                    <TableCell className="space-x-2">
-                                        <Button variant="outline" size="sm">
-                                            Edit
-                                        </Button>
-                                        <Button variant="outline" size="sm">
-                                            <UserPlus className="mr-2 h-4 w-4" />
-                                            Assign
-                                        </Button>
-                                    </TableCell>
-                                </TableRow>
-                            ))}
-                        </TableBody>
-                    </Table>
-                </CardContent>
-            </Card>
+            <AssignQuizClient quizzes={quizzes} candidates={candidates} />
         </div>
     );
 }
+
