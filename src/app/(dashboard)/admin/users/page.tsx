@@ -1,5 +1,4 @@
-
-import { getUsers } from './actions';
+import { getUsers } from '../actions';
 import { UserManagementClient } from './UserManagementClient';
 
 export default async function UserManagementPage() {
