@@ -33,8 +33,12 @@ export default function QuizRunner({ quiz, questions }: QuizRunnerProps) {
         setAnswers(prev => ({ ...prev, [currentQuestion.id]: val }));
     };
 
-    const handleNext = () => {
-        if (!isLastQuestion) setCurrentIndex(prev => prev + 1);
+    const handleNavigation = () => {
+        if (isLastQuestion) {
+            handleSubmit();
+        } else {
+            setCurrentIndex(prev => prev + 1);
+        }
     };
 
     const handlePrev = () => {
@@ -81,7 +85,7 @@ export default function QuizRunner({ quiz, questions }: QuizRunnerProps) {
     const handleSubmit = async () => {
         if (!user) return;
         
-        const answeredQuestionsCount = Object.keys(answers).length;
+        const answeredQuestionsCount = Object.keys(answers).filter(key => answers[key] !== undefined && answers[key] !== '').length;
         const totalQuestionsCount = questions.length;
 
         if (answeredQuestionsCount < totalQuestionsCount) {
@@ -142,7 +146,7 @@ export default function QuizRunner({ quiz, questions }: QuizRunnerProps) {
                     <h3 className="font-bold text-sm mb-3">Questions ({questions.length})</h3>
                     <div className="grid grid-cols-4 gap-2">
                         {questions.map((q, index) => {
-                            const isAnswered = answers[q.id] !== undefined;
+                            const isAnswered = answers[q.id] !== undefined && answers[q.id] !== '';
                             const isFlagged = flagged[q.id];
                             const isCurrent = index === currentIndex;
 
@@ -170,9 +174,9 @@ export default function QuizRunner({ quiz, questions }: QuizRunnerProps) {
                     </div>
                 </div>
                  <div className="p-4 border-t">
-                    <Button onClick={handleSubmit} disabled={submitting} className="w-full">
-                        {submitting ? "Submitting..." : "Submit Quiz"}
-                    </Button>
+                    <p className="text-xs text-center text-muted-foreground">
+                        Navigate using the buttons below or submit on the final question.
+                    </p>
                 </div>
             </div>
             <main className="flex-1 flex flex-col">
@@ -199,9 +203,9 @@ export default function QuizRunner({ quiz, questions }: QuizRunnerProps) {
                      <Button variant="outline" onClick={handleToggleFlag} size="icon">
                         <Flag className={cn("h-4 w-4", flagged[currentQuestion.id] && "text-yellow-500 fill-yellow-400")} />
                     </Button>
-                    <Button onClick={handleNext} disabled={isLastQuestion}>
-                        {isLastQuestion ? 'Finish' : 'Next'}
-                         <ChevronRight className="h-4 w-4 ml-1"/>
+                    <Button onClick={handleNavigation} disabled={submitting}>
+                        {submitting ? "Submitting..." : (isLastQuestion ? 'Submit' : 'Next')}
+                         {!isLastQuestion && <ChevronRight className="h-4 w-4 ml-1"/>}
                     </Button>
                 </div>
             </main>
