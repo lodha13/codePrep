@@ -27,8 +27,10 @@ export async function executeCode(source_code: string, testCases: any[]): Promis
     // Simulate a delay for a realistic feel
     await new Promise(resolve => setTimeout(resolve, 1000));
 
-    // Basic validation: Check if the source code is not empty or has compile error
-    if (!source_code || !source_code.includes(';')) {
+    // --- 1. Simulate Compilation Step ---
+
+    // Basic syntax check for a very common error
+    if (!source_code.includes(';')) {
         return {
             stdout: null,
             stderr: null,
@@ -39,6 +41,28 @@ export async function executeCode(source_code: string, testCases: any[]): Promis
             memory: 0
         };
     }
+    
+    // Simulate an "undeclared variable" compilation error
+    const returnMatch = source_code.match(/return\s+([a-zA-Z0-9_]+);/);
+    if (returnMatch) {
+        const returnedVar = returnMatch[1];
+        // Check if the returned variable is one of the parameters or a known "correct" variable.
+        // This is a simplistic check for simulation purposes.
+        if (returnedVar !== 'nums' && returnedVar !== 'target' && !source_code.includes(` ${returnedVar};`) && !source_code.includes(` ${returnedVar} `)) {
+             return {
+                stdout: null,
+                stderr: null,
+                compile_output: `Error: cannot find symbol\n  symbol:   variable ${returnedVar}\n  location: class Solution`,
+                message: "Execution failed due to a compilation error.",
+                status: { id: 6, description: "Compilation Error" },
+                time: "0.1",
+                memory: 0
+            };
+        }
+    }
+
+
+    // --- 2. Simulate Execution Step ---
 
     // A hardcoded, simplistic "solution" for the mock Two Sum problem.
     const isCorrectSolution = source_code.includes("HashMap") && source_code.includes("complement");
@@ -49,8 +73,8 @@ export async function executeCode(source_code: string, testCases: any[]): Promis
     for (const tc of testCases) {
         // In a real scenario, you'd execute the code with tc.input
         // and compare the result with tc.expectedOutput.
-        // Here, we just simulate it.
-        const passed = isCorrectSolution || (Math.random() > 0.5 && passed_tests < testCases.length -1) ; // Randomly pass some if not perfect
+        // Here, we just simulate it based on whether the "correct" solution is present.
+        const passed = isCorrectSolution;
         
         if (passed) {
             passed_tests++;
@@ -59,7 +83,7 @@ export async function executeCode(source_code: string, testCases: any[]): Promis
         test_case_results.push({
             input: tc.input,
             expected: tc.expectedOutput,
-            actual: passed ? tc.expectedOutput : '[-1, -1]', // Simulate wrong output
+            actual: passed ? tc.expectedOutput : '[-1, -1]', // Simulate wrong output if solution is not perfect
             passed: passed,
         });
     }
@@ -81,6 +105,7 @@ export async function executeCode(source_code: string, testCases: any[]): Promis
         };
     }
 
+    // If we reach here, it means compilation was fine, but the logic was wrong.
     return {
         stdout: null,
         stderr: "One or more test cases failed.",
