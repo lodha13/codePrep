@@ -71,7 +71,7 @@ const prompt = ai.definePrompt({
     2.  All questions must be practical and scenario-based. Use code snippets to test theoretical concepts. AVOID purely theoretical questions.
     3.  All code must be in Java.
     4.  MCQ questions must have exactly 4 options.
-    5.  Coding questions must have at least 3 test cases, including edge cases. At least one test case must be hidden.
+    5.  Coding questions must have at least 10 test cases, including edge cases. At least one test case must be hidden.
     6.  All descriptions for questions must be in well-formatted HTML. Use <br/> for line breaks and <code><pre>...</pre></code> for code blocks.
     7.  The final output MUST be a single JSON object that strictly adheres to the provided output schema. Do not include any text or formatting outside of the JSON object.
     `,

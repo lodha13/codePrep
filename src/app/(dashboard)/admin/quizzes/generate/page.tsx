@@ -1,17 +1,18 @@
 
 "use client";
 
-import { useState, useEffect, useActionState } from "react";
+import { useEffect, useActionState } from "react";
 import { useFormStatus } from "react-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { generateQuizAction } from "./actions";
+import { generateQuizAction, seedQuizAction } from "./actions";
 import { useToast } from "@/components/ui/use-toast";
 import Link from "next/link";
-import { ArrowLeft, Wand2 } from "lucide-react";
+import { ArrowLeft, Wand2, DatabaseZap } from "lucide-react";
+import { Separator } from "@/components/ui/separator";
 
 const initialState = {
     message: "",
@@ -27,7 +28,23 @@ function SubmitButton() {
             ) : (
                 <>
                     <Wand2 className="mr-2 h-4 w-4" />
-                    Generate Quiz
+                    Generate Quiz with AI
+                </>
+            )}
+        </Button>
+    );
+}
+
+function SeedButton() {
+    const { pending } = useFormStatus();
+    return (
+        <Button type="submit" disabled={pending} className="w-full" variant="secondary">
+            {pending ? (
+                "Seeding..."
+            ) : (
+                <>
+                    <DatabaseZap className="mr-2 h-4 w-4" />
+                    Seed Java Multithreading Quiz
                 </>
             )}
         </Button>
@@ -35,18 +52,33 @@ function SubmitButton() {
 }
 
 export default function GenerateQuizPage() {
-    const [state, formAction] = useActionState(generateQuizAction, initialState);
+    const [generateState, generateFormAction] = useActionState(generateQuizAction, initialState);
+    const [seedState, seedFormAction] = useActionState(async (previousState: any, formData: FormData) => {
+        const result = await seedQuizAction();
+        return result;
+    }, initialState);
+
     const { toast } = useToast();
 
     useEffect(() => {
-        if (state.message) {
+        if (generateState.message) {
             toast({
-                title: state.success ? "Quiz Generated!" : "Generation Failed",
-                description: state.message,
-                variant: state.success ? "default" : "destructive",
+                title: generateState.success ? "Quiz Generated!" : "Generation Failed",
+                description: generateState.message,
+                variant: generateState.success ? "default" : "destructive",
             });
         }
-    }, [state, toast]);
+    }, [generateState, toast]);
+
+    useEffect(() => {
+        if (seedState.message) {
+            toast({
+                title: seedState.success ? "Quiz Seeded!" : "Seeding Failed",
+                description: seedState.message,
+                variant: seedState.success ? "default" : "destructive",
+            });
+        }
+    }, [seedState, toast]);
 
     return (
         <div className="max-w-2xl mx-auto space-y-6">
@@ -64,7 +96,7 @@ export default function GenerateQuizPage() {
                         Describe the quiz you want to create, and the AI will generate it for you.
                     </CardDescription>
                 </CardHeader>
-                <form action={formAction}>
+                <form action={generateFormAction}>
                     <CardContent className="space-y-6">
                         <div className="grid gap-2">
                             <Label htmlFor="topic">Topic</Label>
@@ -107,7 +139,28 @@ export default function GenerateQuizPage() {
 
                     </CardContent>
                 </form>
+
+                <Separator className="my-6" />
+
+                <CardHeader>
+                     <CardTitle className="text-xl font-headline flex items-center gap-2">
+                        <DatabaseZap className="h-5 w-5" />
+                        Seed Database
+                    </CardTitle>
+                    <CardDescription>
+                        For demonstration purposes, you can add a pre-made quiz about Java Multithreading to the database.
+                    </CardDescription>
+                </CardHeader>
+                 <form action={seedFormAction}>
+                    <CardContent>
+                        <SeedButton />
+                    </CardContent>
+                </form>
+
             </Card>
         </div>
     );
 }
+
+
+    
