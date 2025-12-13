@@ -27,19 +27,13 @@ export default function QuizPage() {
 
             setLoading(true);
 
-            // 1. Check if the user has already COMPLETED this quiz
-            const completedQuery = query(
-                collection(db, "results"),
-                where("userId", "==", user.uid),
-                where("quizId", "==", quizId as string),
-                where("status", "==", "completed")
-            );
-            const completedSnap = await getDocs(completedQuery);
-            if (!completedSnap.empty) {
-                setAlreadyCompleted(true);
-                setLoading(false);
-                return;
+            // 1. Check if the user has already COMPLETED this quiz using the user document.
+            if (user.completedQuizIds?.includes(quizId as string)) {
+                 setAlreadyCompleted(true);
+                 setLoading(false);
+                 return;
             }
+
 
             // 2. Check for an IN-PROGRESS session
             const inProgressQuery = query(
