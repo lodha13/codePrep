@@ -10,6 +10,7 @@ import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Trophy, Calendar } from 'lucide-react';
+import type { Timestamp } from 'firebase/firestore';
 
 export default function ProfilePage() {
     const { user } = useAuth();
@@ -24,23 +25,36 @@ export default function ProfilePage() {
             };
 
             setLoading(true);
-            const resultsQuery = query(collection(db, 'results'), where('userId', '==', user.uid));
+            const resultsQuery = query(
+                collection(db, 'users', user.uid, 'testResults'),
+                where('status', '==', 'completed')
+            );
+            
             const resultsSnap = await getDocs(resultsQuery);
             const userResults = resultsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as QuizResult));
 
             // Sort results by completion date, most recent first
             userResults.sort((a, b) => {
-                const dateA = (a.completedAt as any)?.toDate() || 0;
-                const dateB = (b.completedAt as any)?.toDate() || 0;
-                return dateB - dateA;
+                const dateA = (a.completedAt as Timestamp)?.toDate() || new Date(0);
+                const dateB = (b.completedAt as Timestamp)?.toDate() || new Date(0);
+                return dateB.getTime() - dateA.getTime();
             });
 
             setResults(userResults);
             setLoading(false);
         };
 
-        fetchResults();
+        if (user) {
+            fetchResults();
+        }
     }, [user]);
+
+    const formatDate = (timestamp: Timestamp | undefined) => {
+        if (!timestamp) {
+            return 'N/A';
+        }
+        return timestamp.toDate().toLocaleString();
+    };
 
     return (
         <div className="max-w-7xl mx-auto p-4 md:p-8 lg:p-12">
@@ -76,7 +90,7 @@ export default function ProfilePage() {
                                         </div>
                                          <div className="flex items-center gap-1.5">
                                             <Calendar className="h-4 w-4" />
-                                            <span>Completed on {(result.completedAt as any)?.toDate().toLocaleString()}</span>
+                                            <span>Completed on {formatDate(result.completedAt)}</span>
                                         </div>
                                     </div>
                                 </div>
