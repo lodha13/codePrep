@@ -78,7 +78,7 @@ export interface QuestionResult {
     status: "correct" | "incorrect" | "partial";
     score: number;
     total: number; // The maximum possible score for this question.
-    userAnswer?: string | number; // Index for MCQ, Code for Coding
+    userAnswer?: string; // Index for MCQ, Code for Coding
     testCaseResults?: TestCaseResult[]; // For coding questions
 }
 
@@ -87,10 +87,10 @@ export interface QuizResult {
     quizId: string;
     quizTitle: string; // Denormalized for faster reads
     userId: string;
-    startedAt: Date | Timestamp;
-    completedAt?: Date | Timestamp;
+    startedAt: Timestamp;
+    completedAt?: Timestamp;
     score: number;
     totalScore: number;
     status: "in-progress" | "completed";
-    answers: Record<string, QuestionResult>; // Map questionId to result
+    answers: Record<string, QuestionResult | { userAnswer: string }>; // Map questionId to result
 }

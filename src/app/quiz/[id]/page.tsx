@@ -3,9 +3,9 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import { doc, getDoc, getDocs, collection, query, where, documentId, limit } from "firebase/firestore";
+import { doc, getDoc, getDocs, collection, query, where, documentId, addDoc, Timestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { Quiz, Question } from "@/types/schema";
+import { Quiz, Question, QuizResult } from "@/types/schema";
 import QuizRunner from "@/components/quiz/QuizRunner";
 import { useAuth } from "@/context/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,80 +13,130 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 
 export default function QuizPage() {
-    const { id } = useParams(); // quiz id
+    const { id: quizId } = useParams();
     const { user, loading: authLoading } = useAuth();
     const [quiz, setQuiz] = useState<Quiz | null>(null);
     const [questions, setQuestions] = useState<Question[]>([]);
+    const [quizSession, setQuizSession] = useState<QuizResult | null>(null);
     const [loading, setLoading] = useState(true);
-    const [alreadyAttempted, setAlreadyAttempted] = useState(false);
+    const [alreadyCompleted, setAlreadyCompleted] = useState(false);
 
     useEffect(() => {
-        const fetchData = async () => {
-            if (!id || !user || authLoading) return;
+        const findOrCreateSession = async () => {
+            if (!quizId || !user) return;
 
-            // More reliable check: Query the results collection to see if this user has
-            // already submitted a result for this quiz.
-            const resultsQuery = query(
-                collection(db, "results"), 
-                where("userId", "==", user.uid), 
-                where("quizId", "==", id as string),
-                limit(1) // We only need to know if at least one exists
+            setLoading(true);
+
+            // 1. Check if the user has already COMPLETED this quiz
+            const completedQuery = query(
+                collection(db, "results"),
+                where("userId", "==", user.uid),
+                where("quizId", "==", quizId as string),
+                where("status", "==", "completed")
             );
-            const resultsSnapshot = await getDocs(resultsQuery);
-
-            if (!resultsSnapshot.empty) {
-                setAlreadyAttempted(true);
+            const completedSnap = await getDocs(completedQuery);
+            if (!completedSnap.empty) {
+                setAlreadyCompleted(true);
                 setLoading(false);
                 return;
             }
 
-            const quizRef = doc(db, "quizzes", id as string);
-            const quizSnap = await getDoc(quizRef);
+            // 2. Check for an IN-PROGRESS session
+            const inProgressQuery = query(
+                collection(db, "results"),
+                where("userId", "==", user.uid),
+                where("quizId", "==", quizId as string),
+                where("status", "==", "in-progress")
+            );
+            const sessionSnap = await getDocs(inProgressQuery);
 
-            if (quizSnap.exists()) {
+            let session: QuizResult;
+
+            if (sessionSnap.empty) {
+                // 3. If no session, fetch quiz data to create a new one
+                const quizRef = doc(db, "quizzes", quizId as string);
+                const quizSnap = await getDoc(quizRef);
+
+                if (!quizSnap.exists()) {
+                    setLoading(false);
+                    return; // Quiz not found
+                }
                 const quizData = { id: quizSnap.id, ...quizSnap.data() } as Quiz;
                 setQuiz(quizData);
 
-                if (quizData.questionIds && quizData.questionIds.length > 0) {
-                    const qQuery = query(collection(db, "questions"), where(documentId(), "in", quizData.questionIds));
-                    const qSnap = await getDocs(qQuery);
-                    const qList = qSnap.docs.map(d => ({ id: d.id, ...d.data() } as Question));
+                // Create a new session document
+                const newSessionData: Omit<QuizResult, 'id'> = {
+                    quizId: quizData.id,
+                    quizTitle: quizData.title,
+                    userId: user.uid,
+                    startedAt: Timestamp.now(),
+                    status: 'in-progress',
+                    score: 0,
+                    totalScore: 0,
+                    answers: {},
+                };
+                const sessionRef = await addDoc(collection(db, "results"), newSessionData);
+                session = { id: sessionRef.id, ...newSessionData };
+            } else {
+                // 4. If session exists, use it
+                const sessionDoc = sessionSnap.docs[0];
+                session = { id: sessionDoc.id, ...sessionDoc.data() } as QuizResult;
 
-                    const orderedQuestions = quizData.questionIds.map(qid => qList.find(q => q.id === qid)).filter(Boolean) as Question[];
-
-                    setQuestions(orderedQuestions);
+                // Also fetch quiz data if not already fetched
+                const quizRef = doc(db, "quizzes", quizId as string);
+                const quizSnap = await getDoc(quizRef);
+                if (quizSnap.exists()) {
+                    setQuiz({ id: quizSnap.id, ...quizSnap.data() } as Quiz);
                 }
             }
+
+            setQuizSession(session);
+
+            // 5. Fetch questions for the quiz
+            if (session && quiz?.questionIds?.length) {
+                const qQuery = query(collection(db, "questions"), where(documentId(), "in", quiz.questionIds));
+                const qSnap = await getDocs(qQuery);
+                const qList = qSnap.docs.map(d => ({ id: d.id, ...d.data() } as Question));
+
+                const orderedQuestions = quiz.questionIds.map(qid => qList.find(q => q.id === qid)).filter(Boolean) as Question[];
+                setQuestions(orderedQuestions);
+            }
+
             setLoading(false);
         };
 
-        if (user) {
-          fetchData();
+        if (!authLoading && user) {
+            findOrCreateSession();
         }
-    }, [id, user, authLoading]);
+    }, [quizId, user, authLoading, quiz]);
+
 
     if (loading || authLoading) return <div className="p-8 text-center">Loading Quiz...</div>;
-    
-    if (alreadyAttempted) {
+
+    if (alreadyCompleted) {
         return (
-             <div className="flex h-screen w-screen items-center justify-center bg-background">
+            <div className="flex h-screen w-screen items-center justify-center bg-background">
                 <Card className="max-w-lg text-center p-8">
                     <CardHeader>
-                        <CardTitle className="text-2xl font-bold">Quiz Already Attempted</CardTitle>
+                        <CardTitle className="text-2xl font-bold">Quiz Already Completed</CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-4">
-                        <p>You have already completed this quiz and cannot attempt it again.</p>
-                        <p className="text-sm text-muted-foreground">If you believe this is an error, please contact an administrator.</p>
-                        <Button asChild className="mt-4">
-                            <Link href="/candidate">Back to Dashboard</Link>
-                        </Button>
+                        <p>You have already completed this quiz. You can view your results on your profile page.</p>
+                        <div className="flex justify-center gap-4">
+                            <Button asChild className="mt-4">
+                                <Link href="/candidate/profile">View Results</Link>
+                            </Button>
+                             <Button asChild variant="outline" className="mt-4">
+                                <Link href="/candidate">Back to Dashboard</Link>
+                            </Button>
+                        </div>
                     </CardContent>
                 </Card>
             </div>
         );
     }
 
-    if (!quiz) return <div className="p-8 text-center">Quiz not found or you do not have access.</div>;
+    if (!quiz || !quizSession) return <div className="p-8 text-center">Quiz not found or you do not have access.</div>;
 
-    return <QuizRunner quiz={quiz} questions={questions} />;
+    return <QuizRunner quiz={quiz} questions={questions} session={quizSession} />;
 }

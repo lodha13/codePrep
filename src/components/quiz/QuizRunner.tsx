@@ -1,57 +1,145 @@
 
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Quiz, Question, QuestionResult, QuizResult, MCQQuestion, CodingQuestion } from "@/types/schema";
 import { Button } from "@/components/ui/button";
 import MCQView from "./MCQView";
 import CodingView from "./CodingView";
-import { doc, Timestamp, writeBatch, arrayUnion } from "firebase/firestore";
+import { doc, Timestamp, writeBatch, updateDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
 import { Flag, ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { executeCode } from "@/lib/code-execution";
+import { useDebouncedCallback } from "use-debounce";
 
 interface QuizRunnerProps {
     quiz: Quiz;
     questions: Question[];
+    session: QuizResult;
 }
 
-// Helper to format time
 const formatTime = (seconds: number) => {
+    if (seconds < 0) return "00:00";
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
 };
 
-export default function QuizRunner({ quiz, questions }: QuizRunnerProps) {
+export default function QuizRunner({ quiz, questions, session }: QuizRunnerProps) {
     const [currentIndex, setCurrentIndex] = useState(0);
-    const [answers, setAnswers] = useState<Record<string, string>>({});
+    const [answers, setAnswers] = useState<Record<string, { userAnswer: string }>>(() => session.answers);
     const [flagged, setFlagged] = useState<Record<string, boolean>>({});
     const [submitting, setSubmitting] = useState(false);
-    const [startTime] = useState(() => Timestamp.now());
-    const [timeRemaining, setTimeRemaining] = useState(quiz.durationMinutes * 60);
+    
+    const calculateInitialTime = () => {
+        const startTime = (session.startedAt as Timestamp).toDate().getTime();
+        const now = Date.now();
+        const elapsed = Math.floor((now - startTime) / 1000);
+        return (quiz.durationMinutes * 60) - elapsed;
+    };
+
+    const [timeRemaining, setTimeRemaining] = useState(calculateInitialTime);
 
     const { user } = useAuth();
     const router = useRouter();
 
-    const timerRef = useRef<NodeJS.Timeout | null>(null);
-    const isSubmittingRef = useRef(submitting); // Ref to hold the latest submitting state
-
+    const isSubmittingRef = useRef(submitting);
     useEffect(() => {
         isSubmittingRef.current = submitting;
     }, [submitting]);
 
+    const handleSubmit = useCallback(async (isAutoSubmit = false) => {
+        if (!user || isSubmittingRef.current) return;
+
+        setSubmitting(true);
+        isSubmittingRef.current = true;
+
+        if (!isAutoSubmit) {
+            const answeredQuestionsCount = Object.keys(answers).filter(key => answers[key]?.userAnswer.trim() !== '').length;
+            const totalQuestionsCount = questions.length;
+
+            if (answeredQuestionsCount < totalQuestionsCount) {
+                const confirmed = window.confirm(
+                    `You have only answered ${answeredQuestionsCount} out of ${totalQuestionsCount} questions. Are you sure you want to submit?`
+                );
+                if (!confirmed) {
+                    setSubmitting(false);
+                    isSubmittingRef.current = false;
+                    return;
+                }
+            }
+        }
+        
+        let totalQuizScore = 0;
+        let maxQuizScore = 0;
+        const results: Record<string, QuestionResult> = {};
+
+        for (const q of questions) {
+            const userAnswer = answers[q.id]?.userAnswer;
+            let questionScore = 0;
+            let questionMaxScore = 10; // Default score
+            let status: "correct" | "incorrect" | "partial" = "incorrect";
+            let testCaseResults: QuestionResult['testCaseResults'] = undefined;
+
+            if (q.type === 'mcq') {
+                const mcq = q as MCQQuestion;
+                const isCorrect = userAnswer === mcq.correctOptionIndex.toString();
+                if (isCorrect) {
+                    questionScore = 10;
+                    status = 'correct';
+                }
+            } else if (q.type === 'coding') {
+                const codingQ = q as CodingQuestion;
+                const executionResult = await executeCode(userAnswer || "", codingQ.language, codingQ.testCases);
+                
+                questionScore = executionResult.passed_tests || 0;
+                questionMaxScore = executionResult.total_tests || codingQ.testCases.length;
+                testCaseResults = executionResult.test_case_results;
+                
+                if (questionScore === questionMaxScore && questionMaxScore > 0) {
+                    status = 'correct';
+                } else if (questionScore > 0) {
+                    status = 'partial';
+                }
+            }
+            
+            totalQuizScore += questionScore;
+            maxQuizScore += questionMaxScore;
+
+            results[q.id] = {
+                questionId: q.id,
+                timeTakenSeconds: 0, 
+                status,
+                score: questionScore,
+                total: questionMaxScore,
+                userAnswer: userAnswer || "",
+                testCaseResults: testCaseResults,
+            };
+        }
+
+        const resultDocRef = doc(db, "results", session.id);
+        await updateDoc(resultDocRef, {
+            answers: results,
+            score: totalQuizScore,
+            totalScore: maxQuizScore,
+            status: "completed",
+            completedAt: Timestamp.now(),
+        });
+
+        router.push(`/results/${session.id}`);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [answers, questions, quiz.id, router, session.id, user]);
+    
     useEffect(() => {
-        timerRef.current = setInterval(() => {
+        const timer = setInterval(() => {
             setTimeRemaining(prev => {
                 if (prev <= 1) {
-                    if (timerRef.current) clearInterval(timerRef.current);
-                    // Use ref to avoid stale state in closure
+                    clearInterval(timer);
                     if (!isSubmittingRef.current) {
-                        handleSubmit(true); // Auto-submit
+                        handleSubmit(true);
                     }
                     return 0;
                 }
@@ -59,20 +147,21 @@ export default function QuizRunner({ quiz, questions }: QuizRunnerProps) {
             });
         }, 1000);
 
-        return () => {
-            if (timerRef.current) {
-                clearInterval(timerRef.current);
-            }
-        };
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
+        return () => clearInterval(timer);
+    }, [handleSubmit]);
 
-
-    const currentQuestion = questions[currentIndex];
-    const isLastQuestion = currentIndex === questions.length - 1;
+    const saveProgress = useDebouncedCallback(async (newAnswers: Record<string, { userAnswer: string }>) => {
+        if (!session || !user) return;
+        const resultDocRef = doc(db, "results", session.id);
+        await updateDoc(resultDocRef, {
+            answers: newAnswers,
+        });
+    }, 1500);
 
     const handleAnswer = (val: string) => {
-        setAnswers(prev => ({ ...prev, [currentQuestion.id]: val }));
+        const newAnswers = { ...answers, [currentQuestion.id]: { userAnswer: val } };
+        setAnswers(newAnswers);
+        saveProgress(newAnswers);
     };
 
     const handleNavigation = () => {
@@ -95,115 +184,8 @@ export default function QuizRunner({ quiz, questions }: QuizRunnerProps) {
         setFlagged(prev => ({ ...prev, [currentQuestion.id]: !prev[currentQuestion.id] }));
     };
 
-    const calculateScore = async () => {
-        let totalQuizScore = 0;
-        let maxQuizScore = 0;
-        const results: Record<string, QuestionResult> = {};
-
-        for (const q of questions) {
-            const userAnswer = answers[q.id];
-            let questionScore = 0;
-            let questionMaxScore = 0;
-            let status: "correct" | "incorrect" | "partial" = "incorrect";
-            let testCaseResults: QuestionResult['testCaseResults'] = undefined;
-
-            if (q.type === 'mcq') {
-                const mcq = q as MCQQuestion;
-                questionMaxScore = 10; // Fixed score for MCQs
-                const isCorrect = userAnswer === mcq.correctOptionIndex.toString();
-                if (isCorrect) {
-                    questionScore = 10;
-                    status = 'correct';
-                }
-            } else if (q.type === 'coding') {
-                const codingQ = q as CodingQuestion;
-                // On final submit, run against ALL test cases
-                const executionResult = await executeCode(userAnswer || "", codingQ.language, codingQ.testCases);
-                
-                questionScore = executionResult.passed_tests || 0;
-                questionMaxScore = executionResult.total_tests || codingQ.testCases.length;
-                testCaseResults = executionResult.test_case_results;
-                
-                if (questionScore === questionMaxScore && questionMaxScore > 0) {
-                    status = 'correct';
-                } else if (questionScore > 0) {
-                    status = 'partial';
-                }
-            }
-            
-            totalQuizScore += questionScore;
-            maxQuizScore += questionMaxScore;
-
-            results[q.id] = {
-                questionId: q.id,
-                timeTakenSeconds: 0, // Placeholder
-                status,
-                score: questionScore,
-                total: questionMaxScore,
-                userAnswer: userAnswer || "",
-                testCaseResults: testCaseResults,
-            };
-        }
-        return { score: totalQuizScore, totalScore: maxQuizScore, results };
-    };
-
-    const handleSubmit = async (isAutoSubmit = false) => {
-        if (!user || isSubmittingRef.current) return;
-        
-        setSubmitting(true);
-        isSubmittingRef.current = true;
-
-        if (!isAutoSubmit) {
-            const answeredQuestionsCount = Object.keys(answers).filter(key => answers[key] !== undefined && answers[key] !== '').length;
-            const totalQuestionsCount = questions.length;
-
-            if (answeredQuestionsCount < totalQuestionsCount) {
-                const confirmed = window.confirm(
-                    `You have only answered ${answeredQuestionsCount} out of ${totalQuestionsCount} questions. Are you sure you want to submit?`
-                );
-                if (!confirmed) {
-                    setSubmitting(false); // Abort submission
-                    isSubmittingRef.current = false;
-                    return;
-                }
-            }
-        }
-        
-        if (timerRef.current) clearInterval(timerRef.current);
-
-
-        const { score, totalScore, results } = await calculateScore();
-        const completedAt = Timestamp.now();
-        const resultId = `${quiz.id}_${user.uid}_${Date.now()}`;
-
-        const resultData: Omit<QuizResult, 'id'> = {
-            quizId: quiz.id,
-            quizTitle: quiz.title, // Denormalize quiz title for faster reads on profile page
-            userId: user.uid,
-            startedAt: startTime,
-            completedAt: completedAt,
-            score,
-            totalScore,
-            status: "completed",
-            answers: results,
-        };
-
-        const batch = writeBatch(db);
-
-        // 1. Save the detailed result to the top-level results collection
-        const topLevelResultDocRef = doc(db, "results", resultId);
-        batch.set(topLevelResultDocRef, resultData);
-        
-        // 2. Update the user's document with the completed quiz ID
-        const userDocRef = doc(db, "users", user.uid);
-        batch.update(userDocRef, {
-            completedQuizIds: arrayUnion(quiz.id)
-        });
-
-        await batch.commit();
-
-        router.push(`/results/${resultId}`);
-    };
+    const currentQuestion = questions[currentIndex];
+    const isLastQuestion = currentIndex === questions.length - 1;
 
     if (!currentQuestion) {
         return <div className="p-8 text-center">Loading questions...</div>;
@@ -220,7 +202,7 @@ export default function QuizRunner({ quiz, questions }: QuizRunnerProps) {
                     <h3 className="font-bold text-sm mb-3">Questions ({questions.length})</h3>
                     <div className="grid grid-cols-4 gap-2">
                         {questions.map((q, index) => {
-                            const isAnswered = answers[q.id] !== undefined && answers[q.id] !== '';
+                            const isAnswered = answers[q.id]?.userAnswer !== undefined && answers[q.id]?.userAnswer !== '';
                             const isFlagged = flagged[q.id];
                             const isCurrent = index === currentIndex;
 
@@ -258,13 +240,13 @@ export default function QuizRunner({ quiz, questions }: QuizRunnerProps) {
                      {currentQuestion.type === 'mcq' ? (
                         <MCQView
                             question={currentQuestion as MCQQuestion}
-                            selectedOption={answers[currentQuestion.id]}
+                            selectedOption={answers[currentQuestion.id]?.userAnswer}
                             onSelect={handleAnswer}
                         />
                      ) : (
                         <CodingView
                             question={currentQuestion as CodingQuestion}
-                            currentCode={answers[currentQuestion.id] || (currentQuestion as CodingQuestion).starterCode || ""}
+                            currentCode={answers[currentQuestion.id]?.userAnswer || (currentQuestion as CodingQuestion).starterCode || ""}
                             onCodeChange={handleAnswer}
                         />
                      )}
