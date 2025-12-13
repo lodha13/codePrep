@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Quiz, Question, QuestionResult, QuizResult, MCQQuestion, CodingQuestion } from "@/types/schema";
 import { Button } from "@/components/ui/button";
 import MCQView from "./MCQView";
@@ -23,7 +23,7 @@ interface QuizRunnerProps {
 
 export default function QuizRunner({ quiz, questions, session }: QuizRunnerProps) {
     const [currentIndex, setCurrentIndex] = useState(0);
-    const [answers, setAnswers] = useState<Record<string, QuestionResult>>(() => session.answers);
+    const [answers, setAnswers] = useState<Record<string, { userAnswer: string }>>(() => session.answers || {});
     const [flagged, setFlagged] = useState<Record<string, boolean>>({});
     const [submitting, setSubmitting] = useState(false);
     
@@ -32,7 +32,6 @@ export default function QuizRunner({ quiz, questions, session }: QuizRunnerProps
 
     const handleSubmit = async () => {
         if (!user || submitting) return;
-
         
         const answeredQuestionsCount = Object.values(answers).filter(a => a.userAnswer && a.userAnswer.trim() !== '').length;
         const totalQuestionsCount = questions.length;
@@ -59,8 +58,12 @@ export default function QuizRunner({ quiz, questions, session }: QuizRunnerProps
             let questionScore = 0;
             let questionMaxScore = 10;
             let status: QuestionResult['status'] = "incorrect";
-             let questionResultPayload: Partial<QuestionResult> = {
+            let resultPayload: QuestionResult = {
+                questionId: q.id,
                 userAnswer: userAnswer || "",
+                score: 0,
+                total: 10,
+                status: 'unanswered',
             };
 
             if (!userAnswer) {
@@ -76,28 +79,26 @@ export default function QuizRunner({ quiz, questions, session }: QuizRunnerProps
                 const codingQ = q as CodingQuestion;
                 const executionResult = await executeCode(userAnswer, codingQ.language, codingQ.testCases);
                 
-                questionScore = executionResult.passed_tests || 0;
-                questionMaxScore = executionResult.total_tests || codingQ.testCases.length;
-                questionResultPayload.testCaseResults = executionResult.test_case_results;
+                const passedTests = executionResult.test_case_results?.filter(r => r.passed).length || 0;
+                questionMaxScore = codingQ.testCases.length;
+                questionScore = Math.round((passedTests / questionMaxScore) * 10);
                 
-                if (questionScore === questionMaxScore && questionMaxScore > 0) {
+                resultPayload.testCaseResults = executionResult.test_case_results;
+                
+                if (passedTests === questionMaxScore && questionMaxScore > 0) {
                     status = 'correct';
-                } else if (questionScore > 0) {
+                } else if (passedTests > 0) {
                     status = 'partial';
                 }
             }
             
             totalQuizScore += questionScore;
-            maxQuizScore += questionMaxScore;
+            maxQuizScore += 10; // Each question is worth 10 points for simplicity
 
-            finalAnswers[q.id] = {
-                questionId: q.id,
-                userAnswer: userAnswer || "",
-                score: questionScore,
-                total: questionMaxScore,
-                status,
-                testCaseResults: questionResultPayload.testCaseResults,
-            };
+            resultPayload.score = questionScore;
+            resultPayload.status = status;
+            
+            finalAnswers[q.id] = resultPayload;
         }
 
         const batch = writeBatch(db);
@@ -129,7 +130,7 @@ export default function QuizRunner({ quiz, questions, session }: QuizRunnerProps
         router.push(`/results/${session.id}`);
     };
     
-    const saveProgress = useDebouncedCallback(async (newAnswers: Record<string, QuestionResult>) => {
+    const saveProgress = useDebouncedCallback(async (newAnswers: Record<string, { userAnswer: string }>) => {
         if (!session || !user) return;
         const resultDocRef = doc(db, "results", session.id);
         await updateDoc(resultDocRef, {
@@ -141,10 +142,8 @@ export default function QuizRunner({ quiz, questions, session }: QuizRunnerProps
         const newAnswers = { 
             ...answers, 
             [currentQuestion.id]: { 
-                ...answers[currentQuestion.id],
-                questionId: currentQuestion.id,
                 userAnswer: val,
-            } as QuestionResult
+            }
         };
         setAnswers(newAnswers);
         saveProgress(newAnswers);
