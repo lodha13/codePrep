@@ -51,6 +51,7 @@ export default function QuizPage() {
             const sessionSnap = await getDocs(inProgressQuery);
 
             let session: QuizResult;
+            let currentQuiz: Quiz;
 
             if (sessionSnap.empty) {
                 // 3. If no session, fetch quiz data to create a new one
@@ -61,13 +62,13 @@ export default function QuizPage() {
                     setLoading(false);
                     return; // Quiz not found
                 }
-                const quizData = { id: quizSnap.id, ...quizSnap.data() } as Quiz;
-                setQuiz(quizData);
+                currentQuiz = { id: quizSnap.id, ...quizSnap.data() } as Quiz;
+                setQuiz(currentQuiz);
 
                 // Create a new session document
                 const newSessionData: Omit<QuizResult, 'id'> = {
-                    quizId: quizData.id,
-                    quizTitle: quizData.title,
+                    quizId: currentQuiz.id,
+                    quizTitle: currentQuiz.title,
                     userId: user.uid,
                     startedAt: Timestamp.now(),
                     status: 'in-progress',
@@ -86,19 +87,24 @@ export default function QuizPage() {
                 const quizRef = doc(db, "quizzes", quizId as string);
                 const quizSnap = await getDoc(quizRef);
                 if (quizSnap.exists()) {
-                    setQuiz({ id: quizSnap.id, ...quizSnap.data() } as Quiz);
+                    currentQuiz = { id: quizSnap.id, ...quizSnap.data() } as Quiz;
+                    setQuiz(currentQuiz);
+                } else {
+                    // This case should ideally not happen if a session exists
+                    setLoading(false);
+                    return;
                 }
             }
 
             setQuizSession(session);
 
             // 5. Fetch questions for the quiz
-            if (session && quiz?.questionIds?.length) {
-                const qQuery = query(collection(db, "questions"), where(documentId(), "in", quiz.questionIds));
+            if (session && currentQuiz?.questionIds?.length) {
+                const qQuery = query(collection(db, "questions"), where(documentId(), "in", currentQuiz.questionIds));
                 const qSnap = await getDocs(qQuery);
                 const qList = qSnap.docs.map(d => ({ id: d.id, ...d.data() } as Question));
 
-                const orderedQuestions = quiz.questionIds.map(qid => qList.find(q => q.id === qid)).filter(Boolean) as Question[];
+                const orderedQuestions = currentQuiz.questionIds.map(qid => qList.find(q => q.id === qid)).filter(Boolean) as Question[];
                 setQuestions(orderedQuestions);
             }
 
@@ -108,7 +114,7 @@ export default function QuizPage() {
         if (!authLoading && user) {
             findOrCreateSession();
         }
-    }, [quizId, user, authLoading, quiz]);
+    }, [quizId, user, authLoading]);
 
 
     if (loading || authLoading) return <div className="p-8 text-center">Loading Quiz...</div>;
