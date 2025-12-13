@@ -257,5 +257,3 @@ export default function QuizRunner({ quiz, questions, session }: QuizRunnerProps
         </div>
     );
 }
-
-    

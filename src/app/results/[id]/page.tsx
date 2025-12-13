@@ -73,8 +73,6 @@ export default function ResultPage() {
     if (!result) return <div className="p-8 text-center">Result not found or you don't have permission to view it.</div>;
 
     const percentage = result.totalScore > 0 ? Math.round((result.score / result.totalScore) * 100) : 0;
-
-    const hydratedAnswers = Object.values(result.answers);
     
     const getStatusIcon = (status: QuestionResult['status']) => {
         switch (status) {
@@ -189,12 +187,16 @@ export default function ResultPage() {
 
             <div className="space-y-4">
                 <h2 className="text-2xl font-bold font-headline">Detailed Breakdown</h2>
-                {hydratedAnswers.map((ans, idx) => {
-                    const question = questions[ans.questionId];
-                    if (!question) return null;
+                {Object.entries(result.answers).map(([questionId, ans]) => {
+                    const question = questions[questionId];
+                    if (!question) return (
+                        <Card key={questionId} className="p-4">
+                            <p>Could not load details for question ID: {questionId}</p>
+                        </Card>
+                    );
 
                     return (
-                        <Card key={idx} className="p-4">
+                        <Card key={questionId} className="p-4">
                             <div className="flex justify-between items-start">
                                     <div className="flex items-start gap-4">
                                     {getStatusIcon(ans.status)}
@@ -218,5 +220,3 @@ export default function ResultPage() {
         </div>
     );
 }
-
-    
