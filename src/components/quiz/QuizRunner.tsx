@@ -140,15 +140,16 @@ export default function QuizRunner({ quiz, questions, session }: QuizRunnerProps
     }, [answers, questions, quiz.id, router, session.id, user]);
     
     useEffect(() => {
-        // Set initial time on mount
+        // Set initial time on mount, calculated from the server's start time
         setTimeRemaining(calculateInitialTime());
 
+        // This interval handles the client-side countdown display.
         const timer = setInterval(() => {
             setTimeRemaining(prev => {
                 if (prev <= 1) {
                     clearInterval(timer);
                     if (!isSubmittingRef.current) {
-                        handleSubmit(true);
+                        handleSubmit(true); // Auto-submit when time runs out
                     }
                     return 0;
                 }
@@ -278,3 +279,5 @@ export default function QuizRunner({ quiz, questions, session }: QuizRunnerProps
         </div>
     );
 }
+
+    
