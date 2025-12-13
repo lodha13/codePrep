@@ -23,7 +23,7 @@ interface QuizRunnerProps {
 
 export default function QuizRunner({ quiz, questions, session }: QuizRunnerProps) {
     const [currentIndex, setCurrentIndex] = useState(0);
-    const [answers, setAnswers] = useState<Record<string, { userAnswer: string }>>(() => session.answers);
+    const [answers, setAnswers] = useState<Record<string, QuestionResult>>(() => session.answers);
     const [flagged, setFlagged] = useState<Record<string, boolean>>({});
     const [submitting, setSubmitting] = useState(false);
     
@@ -34,7 +34,7 @@ export default function QuizRunner({ quiz, questions, session }: QuizRunnerProps
         if (!user || submitting) return;
 
         
-        const answeredQuestionsCount = Object.keys(answers).filter(key => answers[key]?.userAnswer.trim() !== '').length;
+        const answeredQuestionsCount = Object.values(answers).filter(a => a.userAnswer && a.userAnswer.trim() !== '').length;
         const totalQuestionsCount = questions.length;
 
         if (answeredQuestionsCount < totalQuestionsCount) {
@@ -50,18 +50,22 @@ export default function QuizRunner({ quiz, questions, session }: QuizRunnerProps
         
         let totalQuizScore = 0;
         let maxQuizScore = 0;
-        const results: Record<string, QuestionResult> = {};
+        const finalAnswers: Record<string, QuestionResult> = {};
 
         for (const q of questions) {
-            const userAnswer = answers[q.id]?.userAnswer;
+            const currentAnswer = answers[q.id];
+            const userAnswer = currentAnswer?.userAnswer;
+            
             let questionScore = 0;
             let questionMaxScore = 10;
-            let status: "correct" | "incorrect" | "partial" = "incorrect";
+            let status: QuestionResult['status'] = "incorrect";
              let questionResultPayload: Partial<QuestionResult> = {
                 userAnswer: userAnswer || "",
             };
 
-            if (q.type === 'mcq') {
+            if (!userAnswer) {
+                status = "unanswered";
+            } else if (q.type === 'mcq') {
                 const mcq = q as MCQQuestion;
                 const isCorrect = userAnswer === mcq.correctOptionIndex.toString();
                 if (isCorrect) {
@@ -70,7 +74,7 @@ export default function QuizRunner({ quiz, questions, session }: QuizRunnerProps
                 }
             } else if (q.type === 'coding') {
                 const codingQ = q as CodingQuestion;
-                const executionResult = await executeCode(userAnswer || "", codingQ.language, codingQ.testCases);
+                const executionResult = await executeCode(userAnswer, codingQ.language, codingQ.testCases);
                 
                 questionScore = executionResult.passed_tests || 0;
                 questionMaxScore = executionResult.total_tests || codingQ.testCases.length;
@@ -86,14 +90,13 @@ export default function QuizRunner({ quiz, questions, session }: QuizRunnerProps
             totalQuizScore += questionScore;
             maxQuizScore += questionMaxScore;
 
-            results[q.id] = {
-                ...questionResultPayload,
+            finalAnswers[q.id] = {
                 questionId: q.id,
-                timeTakenSeconds: 0, 
-                status,
+                userAnswer: userAnswer || "",
                 score: questionScore,
                 total: questionMaxScore,
-                userAnswer: userAnswer || "",
+                status,
+                testCaseResults: questionResultPayload.testCaseResults,
             };
         }
 
@@ -105,7 +108,7 @@ export default function QuizRunner({ quiz, questions, session }: QuizRunnerProps
         const timeTakenSeconds = completedAt.seconds - (session.startedAt as Timestamp).seconds;
 
         batch.update(resultDocRef, {
-            answers: results,
+            answers: finalAnswers,
             score: totalQuizScore,
             totalScore: maxQuizScore,
             status: "completed",
@@ -126,7 +129,7 @@ export default function QuizRunner({ quiz, questions, session }: QuizRunnerProps
         router.push(`/results/${session.id}`);
     };
     
-    const saveProgress = useDebouncedCallback(async (newAnswers: Record<string, { userAnswer: string }>) => {
+    const saveProgress = useDebouncedCallback(async (newAnswers: Record<string, QuestionResult>) => {
         if (!session || !user) return;
         const resultDocRef = doc(db, "results", session.id);
         await updateDoc(resultDocRef, {
@@ -135,7 +138,14 @@ export default function QuizRunner({ quiz, questions, session }: QuizRunnerProps
     }, 1500);
 
     const handleAnswer = (val: string) => {
-        const newAnswers = { ...answers, [currentQuestion.id]: { userAnswer: val } };
+        const newAnswers = { 
+            ...answers, 
+            [currentQuestion.id]: { 
+                ...answers[currentQuestion.id],
+                questionId: currentQuestion.id,
+                userAnswer: val,
+            } as QuestionResult
+        };
         setAnswers(newAnswers);
         saveProgress(newAnswers);
     };

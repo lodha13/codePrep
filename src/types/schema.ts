@@ -74,8 +74,8 @@ export interface TestCaseResult {
 
 export interface QuestionResult {
     questionId: string;
-    timeTakenSeconds: number;
-    status: "correct" | "incorrect" | "partial";
+    timeTakenSeconds?: number;
+    status: "correct" | "incorrect" | "partial" | "unanswered";
     score: number;
     total: number; // The maximum possible score for this question.
     userAnswer?: string; // Index for MCQ, Code for Coding
@@ -92,6 +92,6 @@ export interface QuizResult {
     score: number;
     totalScore: number;
     status: "in-progress" | "completed";
-    answers: Record<string, QuestionResult | { userAnswer: string }>; // Map questionId to result
+    answers: Record<string, QuestionResult>; // Map questionId to result
     timeTakenSeconds?: number;
 }

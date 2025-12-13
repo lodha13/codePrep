@@ -84,11 +84,12 @@ export default function ResultPage() {
         questionType: questions[ans.questionId]?.type
     }));
     
-    const getStatusIcon = (status: 'correct' | 'incorrect' | 'partial') => {
+    const getStatusIcon = (status: QuestionResult['status']) => {
         switch (status) {
             case 'correct':
                 return <CheckCircle className="text-green-500 h-6 w-6 flex-shrink-0" />;
             case 'incorrect':
+            case 'unanswered':
                 return <XCircle className="text-red-500 h-6 w-6 flex-shrink-0" />;
             case 'partial':
                 return <AlertCircle className="text-yellow-500 h-6 w-6 flex-shrink-0" />;
