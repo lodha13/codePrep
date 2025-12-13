@@ -5,18 +5,14 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { doc, getDoc, collection, getDocs, query, where, documentId } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { QuizResult, Question, Quiz, QuestionResult, CodingQuestion, TestCaseResult } from "@/types/schema";
+import { QuizResult, Question, Quiz, QuestionResult, CodingQuestion, TestCaseResult, MCQQuestion } from "@/types/schema";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { CheckCircle, XCircle, ChevronRight, AlertCircle, Clock } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { Badge } from "@/components/ui/badge";
-
-type HydratedAnswer = QuestionResult & {
-    questionTitle?: string;
-    questionType?: 'mcq' | 'coding';
-};
+import { cn } from "@/lib/utils";
 
 const formatTimeTaken = (totalSeconds: number | undefined) => {
     if (totalSeconds === undefined) return 'N/A';
@@ -62,7 +58,7 @@ export default function ResultPage() {
                 const qQuery = query(collection(db, "questions"), where(documentId(), "in", questionIds));
                 const qSnap = await getDocs(qQuery);
                 const qData = qSnap.docs.reduce((acc, doc) => {
-                    acc[doc.id] = doc.data() as Question;
+                    acc[doc.id] = { id: doc.id, ...doc.data() } as Question;
                     return acc;
                 }, {} as Record<string, Question>);
                 setQuestions(qData);
@@ -78,11 +74,7 @@ export default function ResultPage() {
 
     const percentage = result.totalScore > 0 ? Math.round((result.score / result.totalScore) * 100) : 0;
 
-    const hydratedAnswers: HydratedAnswer[] = Object.values(result.answers).map(ans => ({
-        ...ans,
-        questionTitle: questions[ans.questionId]?.title || 'Unknown Question',
-        questionType: questions[ans.questionId]?.type
-    }));
+    const hydratedAnswers = Object.values(result.answers);
     
     const getStatusIcon = (status: QuestionResult['status']) => {
         switch (status) {
@@ -97,28 +89,75 @@ export default function ResultPage() {
                 return null;
         }
     }
+
+    const renderMCQResult = (answer: QuestionResult, question: MCQQuestion) => {
+        const userAnswerIndex = answer.userAnswer ? parseInt(answer.userAnswer, 10) : -1;
+        const correctIndex = question.correctOptionIndex;
+
+        return (
+            <div className="mt-4 space-y-2">
+                 <h4 className="text-sm font-semibold text-muted-foreground">Options:</h4>
+                 <div className="space-y-3">
+                    {question.options.map((option, index) => {
+                        const isCorrect = index === correctIndex;
+                        const isUserAnswer = index === userAnswerIndex;
+
+                        return (
+                            <div key={index} className={cn(
+                                "p-3 rounded-md border text-sm flex items-start gap-3",
+                                isCorrect && "bg-green-100/60 border-green-300 text-green-900",
+                                isUserAnswer && !isCorrect && "bg-red-100/60 border-red-300 text-red-900"
+                            )}>
+                                {isCorrect ? (
+                                    <CheckCircle className="h-5 w-5 text-green-600 flex-shrink-0 mt-0.5" />
+                                ) : (isUserAnswer && !isCorrect) ? (
+                                    <XCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
+                                ) : (
+                                    <div className="h-5 w-5 flex-shrink-0" /> // Placeholder for alignment
+                                )}
+                               <span>{option}</span>
+                            </div>
+                        )
+                    })}
+                 </div>
+            </div>
+        )
+    };
     
-    const renderTestCaseResults = (testCaseResults: TestCaseResult[]) => (
+    const renderCodingResult = (answer: QuestionResult, question: CodingQuestion) => (
         <div className="mt-4 space-y-3">
-             <h4 className="text-sm font-semibold text-muted-foreground">Test Case Breakdown:</h4>
-            {testCaseResults.map((tc, index) => (
-                <Card key={index} className="bg-secondary/50 p-3 text-xs">
-                    <div className="flex items-center justify-between mb-2">
-                         <div className="flex items-center gap-2">
-                             {tc.passed ? <CheckCircle className="h-4 w-4 text-green-500"/> : <XCircle className="h-4 w-4 text-red-500"/>}
-                            <span className="font-semibold">Test Case {index + 1}</span>
-                         </div>
-                        <Badge variant={tc.passed ? 'default' : 'destructive'}>
-                            {tc.passed ? 'Passed' : 'Failed'}
-                        </Badge>
+            <div>
+                <h4 className="text-sm font-semibold text-muted-foreground">Your Submitted Code:</h4>
+                <pre className="mt-1 font-mono bg-gray-100 p-3 rounded text-xs whitespace-pre-wrap w-full overflow-x-auto">
+                    <code>{answer.userAnswer || "No Answer Submitted"}</code>
+                </pre>
+            </div>
+            
+             {answer.testCaseResults && (
+                <div>
+                    <h4 className="text-sm font-semibold text-muted-foreground">Test Case Breakdown:</h4>
+                    <div className="mt-2 space-y-3">
+                        {answer.testCaseResults.map((tc, index) => (
+                            <Card key={index} className="bg-secondary/50 p-3 text-xs">
+                                <div className="flex items-center justify-between mb-2">
+                                    <div className="flex items-center gap-2">
+                                        {tc.passed ? <CheckCircle className="h-4 w-4 text-green-500"/> : <XCircle className="h-4 w-4 text-red-500"/>}
+                                        <span className="font-semibold">Test Case {index + 1} {tc.passed ? "" : " - Failed"}</span>
+                                    </div>
+                                    <Badge variant={tc.passed ? 'default' : 'destructive'}>
+                                        {tc.passed ? 'Passed' : 'Failed'}
+                                    </Badge>
+                                </div>
+                                <div className="font-mono bg-background p-2 rounded-md space-y-1">
+                                    <p><span className="font-semibold">Input:</span> {tc.input}</p>
+                                    <p><span className="font-semibold">Expected:</span> {tc.expected}</p>
+                                    <p><span className="font-semibold">Got:</span> {tc.actual}</p>
+                                </div>
+                            </Card>
+                        ))}
                     </div>
-                    <div className="font-mono bg-background p-2 rounded-md space-y-1">
-                        <p><span className="font-semibold">Input:</span> {tc.input}</p>
-                        <p><span className="font-semibold">Expected:</span> {tc.expected}</p>
-                        <p><span className="font-semibold">Got:</span> {tc.actual}</p>
-                    </div>
-                </Card>
-            ))}
+                </div>
+             )}
         </div>
     );
 
@@ -150,31 +189,30 @@ export default function ResultPage() {
 
             <div className="space-y-4">
                 <h2 className="text-2xl font-bold font-headline">Detailed Breakdown</h2>
-                {hydratedAnswers.map((ans, idx) => (
-                    <Card key={idx} className="p-4">
-                       <div className="flex justify-between items-start">
-                             <div className="flex items-start gap-4">
-                                {getStatusIcon(ans.status)}
-                                <div>
-                                    <p className="font-semibold">{ans.questionTitle}</p>
+                {hydratedAnswers.map((ans, idx) => {
+                    const question = questions[ans.questionId];
+                    if (!question) return null;
+
+                    return (
+                        <Card key={idx} className="p-4">
+                            <div className="flex justify-between items-start">
+                                    <div className="flex items-start gap-4">
+                                    {getStatusIcon(ans.status)}
+                                    <div>
+                                        <p className="font-semibold">{question.title}</p>
+                                    </div>
+                                </div>
+                                <div className="font-bold text-lg text-right flex-shrink-0">
+                                    {ans.score} / {ans.total} pts
                                 </div>
                             </div>
-                            <div className="font-bold text-lg text-right">
-                                {ans.score} / {ans.total} pts
+                            <div className="mt-2 pl-10">
+                                {question.type === 'mcq' && renderMCQResult(ans, question as MCQQuestion)}
+                                {question.type === 'coding' && renderCodingResult(ans, question as CodingQuestion)}
                             </div>
-                       </div>
-                        <div className="mt-4 pl-10">
-                            <p className="text-xs text-muted-foreground">Your answer:</p>
-                             {ans.questionType === 'coding' ? (
-                                <pre className="mt-1 font-mono bg-gray-100 p-3 rounded text-xs whitespace-pre-wrap w-full overflow-x-auto"><code>{ans.userAnswer || "No Answer"}</code></pre>
-                             ) : (
-                                <p className="font-mono bg-gray-100 p-2 rounded text-sm inline-block mt-1">{ans.userAnswer || "No Answer"}</p>
-                             )}
-                             
-                             {ans.questionType === 'coding' && ans.testCaseResults && renderTestCaseResults(ans.testCaseResults)}
-                        </div>
-                    </Card>
-                ))}
+                        </Card>
+                    );
+                })}
             </div>
         </div>
     );
