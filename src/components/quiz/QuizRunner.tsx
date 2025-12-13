@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { Quiz, Question, QuestionResult, QuizResult, MCQQuestion, CodingQuestion } from "@/types/schema";
 import { Button } from "@/components/ui/button";
 import MCQView from "./MCQView";
@@ -21,59 +21,32 @@ interface QuizRunnerProps {
     session: QuizResult;
 }
 
-const formatTime = (seconds: number) => {
-    if (seconds < 0) return "00:00";
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-};
-
 export default function QuizRunner({ quiz, questions, session }: QuizRunnerProps) {
     const [currentIndex, setCurrentIndex] = useState(0);
     const [answers, setAnswers] = useState<Record<string, { userAnswer: string }>>(() => session.answers);
     const [flagged, setFlagged] = useState<Record<string, boolean>>({});
     const [submitting, setSubmitting] = useState(false);
     
-    const calculateInitialTime = useCallback(() => {
-        const startTime = (session.startedAt as Timestamp).toDate().getTime();
-        const now = Date.now();
-        const elapsed = Math.floor((now - startTime) / 1000);
-        const remaining = (quiz.durationMinutes * 60) - elapsed;
-        return remaining > 0 ? remaining : 0;
-    }, [quiz.durationMinutes, session.startedAt]);
-
-
-    const [timeRemaining, setTimeRemaining] = useState(calculateInitialTime);
-
     const { user } = useAuth();
     const router = useRouter();
 
-    const isSubmittingRef = useRef(submitting);
-    useEffect(() => {
-        isSubmittingRef.current = submitting;
-    }, [submitting]);
+    const handleSubmit = async () => {
+        if (!user || submitting) return;
 
-    const handleSubmit = useCallback(async (isAutoSubmit = false) => {
-        if (!user || isSubmittingRef.current) return;
+        
+        const answeredQuestionsCount = Object.keys(answers).filter(key => answers[key]?.userAnswer.trim() !== '').length;
+        const totalQuestionsCount = questions.length;
 
-        setSubmitting(true);
-        isSubmittingRef.current = true;
-
-        if (!isAutoSubmit) {
-            const answeredQuestionsCount = Object.keys(answers).filter(key => answers[key]?.userAnswer.trim() !== '').length;
-            const totalQuestionsCount = questions.length;
-
-            if (answeredQuestionsCount < totalQuestionsCount) {
-                const confirmed = window.confirm(
-                    `You have only answered ${answeredQuestionsCount} out of ${totalQuestionsCount} questions. Are you sure you want to submit?`
-                );
-                if (!confirmed) {
-                    setSubmitting(false);
-                    isSubmittingRef.current = false;
-                    return;
-                }
+        if (answeredQuestionsCount < totalQuestionsCount) {
+            const confirmed = window.confirm(
+                `You have only answered ${answeredQuestionsCount} out of ${totalQuestionsCount} questions. Are you sure you want to submit?`
+            );
+            if (!confirmed) {
+                return;
             }
         }
+        
+        setSubmitting(true);
         
         let totalQuizScore = 0;
         let maxQuizScore = 0;
@@ -136,31 +109,8 @@ export default function QuizRunner({ quiz, questions, session }: QuizRunnerProps
         });
 
         router.push(`/results/${session.id}`);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [answers, questions, quiz.id, router, session.id, user]);
+    };
     
-    useEffect(() => {
-        // Set initial time on mount, calculated from the server's start time
-        setTimeRemaining(calculateInitialTime());
-
-        // This interval handles the client-side countdown display.
-        const timer = setInterval(() => {
-            setTimeRemaining(prev => {
-                if (prev <= 1) {
-                    clearInterval(timer);
-                    if (!isSubmittingRef.current) {
-                        handleSubmit(true); // Auto-submit when time runs out
-                    }
-                    return 0;
-                }
-                return prev - 1;
-            });
-        }, 1000);
-
-        return () => clearInterval(timer);
-    }, [handleSubmit, calculateInitialTime]);
-
-
     const saveProgress = useDebouncedCallback(async (newAnswers: Record<string, { userAnswer: string }>) => {
         if (!session || !user) return;
         const resultDocRef = doc(db, "results", session.id);
@@ -207,7 +157,7 @@ export default function QuizRunner({ quiz, questions, session }: QuizRunnerProps
             <div className="w-1/4 max-w-[280px] border-r flex flex-col bg-white">
                  <div className="p-4 border-b">
                     <h3 className="font-bold text-lg truncate">{quiz.title}</h3>
-                    <p className={cn("text-sm font-semibold", timeRemaining < 60 ? "text-red-500" : "text-gray-500")}>Time remaining: {formatTime(timeRemaining)}</p>
+                    <p className="text-sm text-gray-500">Time remaining: {quiz.durationMinutes}:00</p>
                 </div>
                 <div className="flex-1 p-4 overflow-y-auto">
                     <h3 className="font-bold text-sm mb-3">Questions ({questions.length})</h3>
@@ -279,5 +229,3 @@ export default function QuizRunner({ quiz, questions, session }: QuizRunnerProps
         </div>
     );
 }
-
-    
