@@ -74,4 +74,17 @@
   body {
     @apply bg-background text-foreground;
   }
+
+  /* Style for code blocks within prose content */
+  .prose pre {
+    @apply bg-muted p-4 rounded-md my-4;
+  }
+
+  .prose pre code {
+    @apply bg-transparent p-0 text-sm font-mono;
+  }
+
+  .prose code:not(pre > code) {
+    @apply bg-muted font-mono px-1 py-0.5 rounded-sm;
+  }
 }
