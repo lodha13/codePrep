@@ -56,54 +56,61 @@ export default function QuizRunner({ quiz, questions, session }: QuizRunnerProps
             const userAnswer = currentAnswer?.userAnswer;
             
             let questionScore = 0;
-            let questionMaxScore = 10;
             let status: QuestionResult['status'] = "incorrect";
-            let resultPayload: QuestionResult = {
+            let resultPayload: Partial<QuestionResult> = {
                 questionId: q.id,
                 userAnswer: userAnswer || "",
-                score: 0,
                 total: 10,
-                status: 'unanswered',
             };
 
-            if (!userAnswer) {
+            if (!userAnswer || userAnswer.trim() === '') {
                 status = "unanswered";
+                questionScore = 0;
             } else if (q.type === 'mcq') {
                 const mcq = q as MCQQuestion;
                 const isCorrect = userAnswer === mcq.correctOptionIndex.toString();
                 if (isCorrect) {
                     questionScore = 10;
                     status = 'correct';
+                } else {
+                    questionScore = 0;
+                    status = 'incorrect';
                 }
             } else if (q.type === 'coding') {
                 const codingQ = q as CodingQuestion;
                 const executionResult = await executeCode(userAnswer, codingQ.language, codingQ.testCases);
                 
                 const passedTests = executionResult.test_case_results?.filter(r => r.passed).length || 0;
-                questionMaxScore = codingQ.testCases.length;
-                questionScore = Math.round((passedTests / questionMaxScore) * 10);
+                const totalTests = codingQ.testCases.length;
+                
+                if (totalTests > 0) {
+                     questionScore = Math.round((passedTests / totalTests) * 10);
+                } else {
+                    questionScore = 0;
+                }
                 
                 resultPayload.testCaseResults = executionResult.test_case_results;
                 
-                if (passedTests === questionMaxScore && questionMaxScore > 0) {
+                if (passedTests === totalTests && totalTests > 0) {
                     status = 'correct';
                 } else if (passedTests > 0) {
                     status = 'partial';
+                } else {
+                    status = 'incorrect';
                 }
             }
             
             totalQuizScore += questionScore;
-            maxQuizScore += 10; // Each question is worth 10 points for simplicity
+            maxQuizScore += 10; 
 
             resultPayload.score = questionScore;
             resultPayload.status = status;
             
-            finalAnswers[q.id] = resultPayload;
+            finalAnswers[q.id] = resultPayload as QuestionResult;
         }
 
         const batch = writeBatch(db);
 
-        // 1. Update the quiz result document
         const resultDocRef = doc(db, "results", session.id);
         const completedAt = Timestamp.now();
         const timeTakenSeconds = completedAt.seconds - (session.startedAt as Timestamp).seconds;
@@ -117,15 +124,12 @@ export default function QuizRunner({ quiz, questions, session }: QuizRunnerProps
             timeTakenSeconds
         });
         
-        // 2. Update the user document to add the completed quiz ID
         const userDocRef = doc(db, "users", user.uid);
         batch.update(userDocRef, {
             completedQuizIds: arrayUnion(quiz.id)
         });
 
-        // 3. Commit the batch
         await batch.commit();
-
 
         router.push(`/results/${session.id}`);
     };
@@ -253,3 +257,5 @@ export default function QuizRunner({ quiz, questions, session }: QuizRunnerProps
         </div>
     );
 }
+
+    
