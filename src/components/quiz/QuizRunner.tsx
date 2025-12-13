@@ -55,9 +55,14 @@ export default function QuizRunner({ quiz, questions, session }: QuizRunnerProps
         for (const q of questions) {
             const userAnswer = answers[q.id]?.userAnswer;
             let questionScore = 0;
-            let questionMaxScore = 10; // Default score
+            let questionMaxScore = 10;
             let status: "correct" | "incorrect" | "partial" = "incorrect";
-            let testCaseResults: QuestionResult['testCaseResults'] = undefined;
+            let questionResultPayload: Omit<QuestionResult, 'questionId' | 'timeTakenSeconds'> = {
+                status: 'incorrect',
+                score: 0,
+                total: 10,
+                userAnswer: userAnswer || "",
+            };
 
             if (q.type === 'mcq') {
                 const mcq = q as MCQQuestion;
@@ -72,7 +77,7 @@ export default function QuizRunner({ quiz, questions, session }: QuizRunnerProps
                 
                 questionScore = executionResult.passed_tests || 0;
                 questionMaxScore = executionResult.total_tests || codingQ.testCases.length;
-                testCaseResults = executionResult.test_case_results;
+                questionResultPayload.testCaseResults = executionResult.test_case_results;
                 
                 if (questionScore === questionMaxScore && questionMaxScore > 0) {
                     status = 'correct';
@@ -85,13 +90,13 @@ export default function QuizRunner({ quiz, questions, session }: QuizRunnerProps
             maxQuizScore += questionMaxScore;
 
             results[q.id] = {
+                ...questionResultPayload,
                 questionId: q.id,
                 timeTakenSeconds: 0, 
                 status,
                 score: questionScore,
                 total: questionMaxScore,
                 userAnswer: userAnswer || "",
-                testCaseResults: testCaseResults,
             };
         }
 
@@ -157,7 +162,8 @@ export default function QuizRunner({ quiz, questions, session }: QuizRunnerProps
             <div className="w-1/4 max-w-[280px] border-r flex flex-col bg-white">
                  <div className="p-4 border-b">
                     <h3 className="font-bold text-lg truncate">{quiz.title}</h3>
-                    <p className="text-sm text-gray-500">Time remaining: {quiz.durationMinutes}:00</p>
+                    {/* Reverted timer UI */}
+                    <p className="text-sm text-gray-500">Questions: {questions.length}</p>
                 </div>
                 <div className="flex-1 p-4 overflow-y-auto">
                     <h3 className="font-bold text-sm mb-3">Questions ({questions.length})</h3>
