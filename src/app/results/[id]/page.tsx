@@ -126,9 +126,11 @@ export default function ResultPage() {
         <div className="mt-4 space-y-3">
             <div>
                 <h4 className="text-sm font-semibold text-muted-foreground">Your Submitted Code:</h4>
-                <pre className="mt-1 font-mono bg-gray-100 p-3 rounded text-xs whitespace-pre-wrap w-full overflow-x-auto">
+                <div className="prose prose-sm max-w-none">
+                  <pre>
                     <code>{answer.userAnswer || "No Answer Submitted"}</code>
-                </pre>
+                  </pre>
+                </div>
             </div>
             
              {answer.testCaseResults && (
@@ -200,7 +202,7 @@ export default function ResultPage() {
                             <div className="flex justify-between items-start mb-4">
                                 <h3 className="text-lg font-semibold">Question {index + 1}: {question.title}</h3>
                                 <div className="font-bold text-lg text-right flex-shrink-0 ml-4">
-                                    {ans.score} / {ans.total} pts
+                                    {ans.score ?? 0} / {ans.total ?? 10} pts
                                 </div>
                             </div>
                             <div className="flex items-start gap-4">
@@ -218,5 +220,3 @@ export default function ResultPage() {
         </div>
     );
 }
-
-    

@@ -57,8 +57,7 @@ export default function QuizRunner({ quiz, questions, session }: QuizRunnerProps
             
             let questionScore = 0;
             let status: QuestionResult['status'] = "incorrect";
-            let resultPayload: Partial<QuestionResult> = {
-                questionId: q.id,
+            let questionResult: Partial<QuestionResult> = {
                 userAnswer: userAnswer || "",
                 total: 10,
             };
@@ -83,13 +82,9 @@ export default function QuizRunner({ quiz, questions, session }: QuizRunnerProps
                 const passedTests = executionResult.test_case_results?.filter(r => r.passed).length || 0;
                 const totalTests = codingQ.testCases.length;
                 
-                if (totalTests > 0) {
-                     questionScore = Math.round((passedTests / totalTests) * 10);
-                } else {
-                    questionScore = 0;
-                }
+                questionScore = totalTests > 0 ? Math.round((passedTests / totalTests) * 10) : 0;
                 
-                resultPayload.testCaseResults = executionResult.test_case_results;
+                questionResult.testCaseResults = executionResult.test_case_results;
                 
                 if (passedTests === totalTests && totalTests > 0) {
                     status = 'correct';
@@ -103,10 +98,11 @@ export default function QuizRunner({ quiz, questions, session }: QuizRunnerProps
             totalQuizScore += questionScore;
             maxQuizScore += 10; 
 
-            resultPayload.score = questionScore;
-            resultPayload.status = status;
+            questionResult.score = questionScore;
+            questionResult.status = status;
+            questionResult.questionId = q.id;
             
-            finalAnswers[q.id] = resultPayload as QuestionResult;
+            finalAnswers[q.id] = questionResult as QuestionResult;
         }
 
         const batch = writeBatch(db);
