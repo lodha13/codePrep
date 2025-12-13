@@ -198,11 +198,12 @@ export default function ResultPage() {
                             <div className="flex justify-between items-start">
                                     <div className="flex items-start gap-4">
                                     {getStatusIcon(ans.status)}
-                                    <div>
-                                        <p className="font-semibold">{question.title}</p>
+                                    <div className="prose prose-sm max-w-none">
+                                        <p className="font-semibold mb-2">{question.title}</p>
+                                        <div dangerouslySetInnerHTML={{ __html: question.description }} />
                                     </div>
                                 </div>
-                                <div className="font-bold text-lg text-right flex-shrink-0">
+                                <div className="font-bold text-lg text-right flex-shrink-0 ml-4">
                                     {ans.score} / {ans.total} pts
                                 </div>
                             </div>
@@ -217,3 +218,5 @@ export default function ResultPage() {
         </div>
     );
 }
+
+    
