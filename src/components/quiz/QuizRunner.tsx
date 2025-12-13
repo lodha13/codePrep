@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Quiz, Question, QuestionResult, QuizResult, MCQQuestion, CodingQuestion } from "@/types/schema";
 import { Button } from "@/components/ui/button";
 import MCQView from "./MCQView";
@@ -19,13 +19,54 @@ interface QuizRunnerProps {
     questions: Question[];
 }
 
+// Helper to format time
+const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+};
+
 export default function QuizRunner({ quiz, questions }: QuizRunnerProps) {
     const [currentIndex, setCurrentIndex] = useState(0);
     const [answers, setAnswers] = useState<Record<string, string>>({});
     const [flagged, setFlagged] = useState<Record<string, boolean>>({});
     const [submitting, setSubmitting] = useState(false);
+    const [startTime] = useState(() => Timestamp.now());
+    const [timeRemaining, setTimeRemaining] = useState(quiz.durationMinutes * 60);
+
     const { user } = useAuth();
     const router = useRouter();
+
+    const timerRef = useRef<NodeJS.Timeout | null>(null);
+    const isSubmittingRef = useRef(submitting); // Ref to hold the latest submitting state
+
+    useEffect(() => {
+        isSubmittingRef.current = submitting;
+    }, [submitting]);
+
+    useEffect(() => {
+        timerRef.current = setInterval(() => {
+            setTimeRemaining(prev => {
+                if (prev <= 1) {
+                    if (timerRef.current) clearInterval(timerRef.current);
+                    // Use ref to avoid stale state in closure
+                    if (!isSubmittingRef.current) {
+                        handleSubmit(true); // Auto-submit
+                    }
+                    return 0;
+                }
+                return prev - 1;
+            });
+        }, 1000);
+
+        return () => {
+            if (timerRef.current) {
+                clearInterval(timerRef.current);
+            }
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
 
     const currentQuestion = questions[currentIndex];
     const isLastQuestion = currentIndex === questions.length - 1;
@@ -106,32 +147,41 @@ export default function QuizRunner({ quiz, questions }: QuizRunnerProps) {
         return { score: totalQuizScore, totalScore: maxQuizScore, results };
     };
 
-    const handleSubmit = async () => {
-        if (!user) return;
+    const handleSubmit = async (isAutoSubmit = false) => {
+        if (!user || isSubmittingRef.current) return;
         
-        const answeredQuestionsCount = Object.keys(answers).filter(key => answers[key] !== undefined && answers[key] !== '').length;
-        const totalQuestionsCount = questions.length;
+        setSubmitting(true);
+        isSubmittingRef.current = true;
 
-        if (answeredQuestionsCount < totalQuestionsCount) {
-            const confirmed = window.confirm(
-                `You have only answered ${answeredQuestionsCount} out of ${totalQuestionsCount} questions. Are you sure you want to submit?`
-            );
-            if (!confirmed) {
-                return; // Abort submission
+        if (!isAutoSubmit) {
+            const answeredQuestionsCount = Object.keys(answers).filter(key => answers[key] !== undefined && answers[key] !== '').length;
+            const totalQuestionsCount = questions.length;
+
+            if (answeredQuestionsCount < totalQuestionsCount) {
+                const confirmed = window.confirm(
+                    `You have only answered ${answeredQuestionsCount} out of ${totalQuestionsCount} questions. Are you sure you want to submit?`
+                );
+                if (!confirmed) {
+                    setSubmitting(false); // Abort submission
+                    isSubmittingRef.current = false;
+                    return;
+                }
             }
         }
+        
+        if (timerRef.current) clearInterval(timerRef.current);
 
-        setSubmitting(true);
 
         const { score, totalScore, results } = await calculateScore();
+        const completedAt = Timestamp.now();
         const resultId = `${quiz.id}_${user.uid}_${Date.now()}`;
 
         const resultData: Omit<QuizResult, 'id'> = {
             quizId: quiz.id,
             quizTitle: quiz.title, // Denormalize quiz title for faster reads on profile page
             userId: user.uid,
-            startedAt: Timestamp.now(), // This should be set when the quiz actually starts
-            completedAt: Timestamp.now(),
+            startedAt: startTime,
+            completedAt: completedAt,
             score,
             totalScore,
             status: "completed",
@@ -164,7 +214,7 @@ export default function QuizRunner({ quiz, questions }: QuizRunnerProps) {
             <div className="w-1/4 max-w-[280px] border-r flex flex-col bg-white">
                  <div className="p-4 border-b">
                     <h3 className="font-bold text-lg truncate">{quiz.title}</h3>
-                    <p className="text-sm text-gray-500">Time remaining: 60:00</p>
+                    <p className={cn("text-sm font-semibold", timeRemaining < 60 ? "text-red-500" : "text-gray-500")}>Time remaining: {formatTime(timeRemaining)}</p>
                 </div>
                 <div className="flex-1 p-4 overflow-y-auto">
                     <h3 className="font-bold text-sm mb-3">Questions ({questions.length})</h3>
@@ -198,7 +248,7 @@ export default function QuizRunner({ quiz, questions }: QuizRunnerProps) {
                     </div>
                 </div>
                  <div className="p-4 border-t">
-                     <Button onClick={handleSubmit} disabled={submitting} className="w-full">
+                     <Button onClick={() => handleSubmit()} disabled={submitting} className="w-full">
                         {submitting ? "Submitting..." : "Submit Quiz"}
                     </Button>
                 </div>
