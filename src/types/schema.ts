@@ -93,4 +93,5 @@ export interface QuizResult {
     totalScore: number;
     status: "in-progress" | "completed";
     answers: Record<string, QuestionResult | { userAnswer: string }>; // Map questionId to result
+    timeTakenSeconds?: number;
 }

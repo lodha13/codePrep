@@ -9,13 +9,20 @@ import { QuizResult, Question, Quiz, QuestionResult, CodingQuestion, TestCaseRes
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import { CheckCircle, XCircle, ChevronRight, AlertCircle } from "lucide-react";
+import { CheckCircle, XCircle, ChevronRight, AlertCircle, Clock } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { Badge } from "@/components/ui/badge";
 
 type HydratedAnswer = QuestionResult & {
     questionTitle?: string;
     questionType?: 'mcq' | 'coding';
+};
+
+const formatTimeTaken = (totalSeconds: number | undefined) => {
+    if (totalSeconds === undefined) return 'N/A';
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return `${minutes}m ${seconds}s`;
 };
 
 export default function ResultPage() {
@@ -124,12 +131,16 @@ export default function ResultPage() {
                  </div>
                 <h1 className="text-4xl font-bold font-headline mt-1">{quiz?.title || 'Quiz'}</h1>
             </header>
-            <Card className="text-center py-10 shadow-lg">
-                <CardHeader>
+            <Card className="shadow-lg">
+                <CardHeader className="text-center">
                     <CardTitle className="text-6xl font-bold font-headline">{percentage}%</CardTitle>
                     <CardDescription className="text-lg">You scored {result.score} out of {result.totalScore}</CardDescription>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="flex flex-col items-center gap-4">
+                     <div className="flex items-center text-muted-foreground">
+                        <Clock className="h-4 w-4 mr-2" />
+                        <span>Time Taken: {formatTimeTaken(result.timeTakenSeconds)}</span>
+                    </div>
                     <Button asChild>
                         <Link href="/candidate">Back to Dashboard</Link>
                     </Button>

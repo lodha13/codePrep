@@ -34,12 +34,14 @@ export default function QuizRunner({ quiz, questions, session }: QuizRunnerProps
     const [flagged, setFlagged] = useState<Record<string, boolean>>({});
     const [submitting, setSubmitting] = useState(false);
     
-    const calculateInitialTime = () => {
+    const calculateInitialTime = useCallback(() => {
         const startTime = (session.startedAt as Timestamp).toDate().getTime();
         const now = Date.now();
         const elapsed = Math.floor((now - startTime) / 1000);
-        return (quiz.durationMinutes * 60) - elapsed;
-    };
+        const remaining = (quiz.durationMinutes * 60) - elapsed;
+        return remaining > 0 ? remaining : 0;
+    }, [quiz.durationMinutes, session.startedAt]);
+
 
     const [timeRemaining, setTimeRemaining] = useState(calculateInitialTime);
 
@@ -121,12 +123,16 @@ export default function QuizRunner({ quiz, questions, session }: QuizRunnerProps
         }
 
         const resultDocRef = doc(db, "results", session.id);
+        const completedAt = Timestamp.now();
+        const timeTakenSeconds = completedAt.seconds - (session.startedAt as Timestamp).seconds;
+
         await updateDoc(resultDocRef, {
             answers: results,
             score: totalQuizScore,
             totalScore: maxQuizScore,
             status: "completed",
-            completedAt: Timestamp.now(),
+            completedAt,
+            timeTakenSeconds
         });
 
         router.push(`/results/${session.id}`);
@@ -134,6 +140,9 @@ export default function QuizRunner({ quiz, questions, session }: QuizRunnerProps
     }, [answers, questions, quiz.id, router, session.id, user]);
     
     useEffect(() => {
+        // Set initial time on mount
+        setTimeRemaining(calculateInitialTime());
+
         const timer = setInterval(() => {
             setTimeRemaining(prev => {
                 if (prev <= 1) {
@@ -148,7 +157,8 @@ export default function QuizRunner({ quiz, questions, session }: QuizRunnerProps
         }, 1000);
 
         return () => clearInterval(timer);
-    }, [handleSubmit]);
+    }, [handleSubmit, calculateInitialTime]);
+
 
     const saveProgress = useDebouncedCallback(async (newAnswers: Record<string, { userAnswer: string }>) => {
         if (!session || !user) return;
