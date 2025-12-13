@@ -6,7 +6,7 @@ import { Quiz, Question, QuestionResult, QuizResult, MCQQuestion, CodingQuestion
 import { Button } from "@/components/ui/button";
 import MCQView from "./MCQView";
 import CodingView from "./CodingView";
-import { doc, Timestamp, writeBatch, updateDoc } from "firebase/firestore";
+import { doc, Timestamp, writeBatch, updateDoc, arrayUnion } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
@@ -57,10 +57,7 @@ export default function QuizRunner({ quiz, questions, session }: QuizRunnerProps
             let questionScore = 0;
             let questionMaxScore = 10;
             let status: "correct" | "incorrect" | "partial" = "incorrect";
-            let questionResultPayload: Omit<QuestionResult, 'questionId' | 'timeTakenSeconds'> = {
-                status: 'incorrect',
-                score: 0,
-                total: 10,
+             let questionResultPayload: Partial<QuestionResult> = {
                 userAnswer: userAnswer || "",
             };
 
@@ -100,11 +97,14 @@ export default function QuizRunner({ quiz, questions, session }: QuizRunnerProps
             };
         }
 
+        const batch = writeBatch(db);
+
+        // 1. Update the quiz result document
         const resultDocRef = doc(db, "results", session.id);
         const completedAt = Timestamp.now();
         const timeTakenSeconds = completedAt.seconds - (session.startedAt as Timestamp).seconds;
 
-        await updateDoc(resultDocRef, {
+        batch.update(resultDocRef, {
             answers: results,
             score: totalQuizScore,
             totalScore: maxQuizScore,
@@ -112,6 +112,16 @@ export default function QuizRunner({ quiz, questions, session }: QuizRunnerProps
             completedAt,
             timeTakenSeconds
         });
+        
+        // 2. Update the user document to add the completed quiz ID
+        const userDocRef = doc(db, "users", user.uid);
+        batch.update(userDocRef, {
+            completedQuizIds: arrayUnion(quiz.id)
+        });
+
+        // 3. Commit the batch
+        await batch.commit();
+
 
         router.push(`/results/${session.id}`);
     };
@@ -162,7 +172,6 @@ export default function QuizRunner({ quiz, questions, session }: QuizRunnerProps
             <div className="w-1/4 max-w-[280px] border-r flex flex-col bg-white">
                  <div className="p-4 border-b">
                     <h3 className="font-bold text-lg truncate">{quiz.title}</h3>
-                    {/* Reverted timer UI */}
                     <p className="text-sm text-gray-500">Questions: {questions.length}</p>
                 </div>
                 <div className="flex-1 p-4 overflow-y-auto">
