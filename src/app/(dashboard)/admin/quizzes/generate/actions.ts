@@ -90,7 +90,7 @@ export async function seedQuizAction() {
             {
                 
                 title: 'ExecutorService Shutdown Behavior',
-                description: 'What happens if you submit a new task to an `ExecutorService` after `shutdown()` has been called? <br/>```java\nExecutorService executor = Executors.newSingleThreadExecutor();\nexecutor.shutdown();\nFuture<String> future = executor.submit(() -> "Task after shutdown");\n```',
+                description: 'What happens if you submit a new task to an `ExecutorService` after `shutdown()` has been called? <br/><pre><code>ExecutorService executor = Executors.newSingleThreadExecutor();\nexecutor.shutdown();\nFuture<String> future = executor.submit(() -> "Task after shutdown");</code></pre>',
                 type: 'mcq',
                 difficulty: 'medium',
                 createdAt: new Date(),
@@ -105,7 +105,7 @@ export async function seedQuizAction() {
             {
                 
                 title: '`volatile` Keyword Guarantee',
-                description: 'A shared variable is declared as `volatile`. What does the `volatile` keyword primarily guarantee?<br/>```java\nprivate volatile boolean flag = false;\n\n// Thread A\nflag = true;\n\n// Thread B\nif (flag) {\n  // do something\n}\n```',
+                description: 'A shared variable is declared as `volatile`. What does the `volatile` keyword primarily guarantee?<br/><pre><code>private volatile boolean flag = false;\n\n// Thread A\nflag = true;\n\n// Thread B\nif (flag) {\n  // do something\n}</code></pre>',
                 type: 'mcq',
                 difficulty: 'medium',
                 createdAt: new Date(),
@@ -135,7 +135,7 @@ export async function seedQuizAction() {
             {
                 
                 title: '`CompletableFuture` Output',
-                description: 'What is the output of the following `CompletableFuture` code?<br/>```java\nCompletableFuture.supplyAsync(() -> "Hello")\n    .thenApplyAsync(s -> s + " World")\n    .thenAccept(System.out::print)\n    .join();\nSystem.out.print(" from Main");\n```',
+                description: 'What is the output of the following `CompletableFuture` code?<br/><pre><code>CompletableFuture.supplyAsync(() -> "Hello")\n    .thenApplyAsync(s -> s + " World")\n    .thenAccept(System.out::print)\n    .join();\nSystem.out.print(" from Main");</code></pre>',
                 type: 'mcq',
                 difficulty: 'hard',
                 createdAt: new Date(),
@@ -150,7 +150,7 @@ export async function seedQuizAction() {
             {
                 
                 title: '`Thread.join()` Behavior',
-                description: 'What is the purpose of `t.join()` in the following code?<br/>```java\nThread t = new Thread(() -> {\n    // some long-running task\n});\nt.start();\nt.join(); // What does this line do?\nSystem.out.println("Main thread finished.");\n```',
+                description: 'What is the purpose of `t.join()` in the following code?<br/><pre><code>Thread t = new Thread(() -> {\n    // some long-running task\n});\nt.start();\nt.join(); // What does this line do?\nSystem.out.println("Main thread finished.");</code></pre>',
                 type: 'mcq',
                 difficulty: 'easy',
                 createdAt: new Date(),
@@ -165,7 +165,7 @@ export async function seedQuizAction() {
             {
                 
                 title: '`ConcurrentHashMap` Atomicity',
-                description: 'Which operation is atomic in `ConcurrentHashMap`?<br/>```java\nConcurrentHashMap<String, Integer> map = new ConcurrentHashMap<>();\n```',
+                description: 'Which operation is atomic in `ConcurrentHashMap`?<br/><pre><code>ConcurrentHashMap<String, Integer> map = new ConcurrentHashMap<>();</code></pre>',
                 type: 'mcq',
                 difficulty: 'medium',
                 createdAt: new Date(),
@@ -180,7 +180,7 @@ export async function seedQuizAction() {
             {
                 
                 title: '`CountDownLatch` Usage',
-                description: 'What will be printed to the console?<br/>```java\nCountDownLatch latch = new CountDownLatch(2);\nnew Thread(() -> {\n    System.out.print("A");\n    latch.countDown();\n}).start();\nnew Thread(() -> {\n    System.out.print("B");\n    latch.countDown();\n}).start();\nlatch.await();\nSystem.out.print("C");\n```',
+                description: 'What will be printed to the console?<br/><pre><code>CountDownLatch latch = new CountDownLatch(2);\nnew Thread(() -> {\n    System.out.print("A");\n    latch.countDown();\n}).start();\nnew Thread(() -> {\n    System.out.print("B");\n    latch.countDown();\n}).start();\nlatch.await();\nSystem.out.print("C");</code></pre>',
                 type: 'mcq',
                 difficulty: 'hard',
                 createdAt: new Date(),
@@ -210,7 +210,7 @@ export async function seedQuizAction() {
             {
                 
                 title: '`synchronized` method output',
-                description: 'Given two threads calling `increment()` on the same `Counter` instance, what is the final value of `count`?<br/>```java\nclass Counter {\n    private int count = 0;\n    public synchronized void increment() {\n        count++;\n    }\n    public int getCount() { return count; }\n}\n// Two threads call increment() 1000 times each.\n```',
+                description: 'Given two threads calling `increment()` on the same `Counter` instance, what is the final value of `count`?<br/><pre><code>class Counter {\n    private int count = 0;\n    public synchronized void increment() {\n        count++;\n    }\n    public int getCount() { return count; }\n}\n// Two threads call increment() 1000 times each.</code></pre>',
                 type: 'mcq',
                 difficulty: 'medium',
                 createdAt: new Date(),
@@ -240,7 +240,7 @@ export async function seedQuizAction() {
             {
                 
                 title: '`Future.get()` Behavior',
-                description: 'What happens when `future.get()` is called?<br/>```java\nExecutorService executor = Executors.newSingleThreadExecutor();\nFuture<String> future = executor.submit(() -> {\n    Thread.sleep(2000);\n    return "Ready";\n});\nString result = future.get(); // This line\n```',
+                description: 'What happens when `future.get()` is called?<br/><pre><code>ExecutorService executor = Executors.newSingleThreadExecutor();\nFuture<String> future = executor.submit(() -> {\n    Thread.sleep(2000);\n    return "Ready";\n});\nString result = future.get(); // This line</code></pre>',
                 type: 'mcq',
                 difficulty: 'medium',
                 createdAt: new Date(),
@@ -280,7 +280,7 @@ export async function seedQuizAction() {
             {
                 
                 title: '`ThreadLocal` Variable Scope',
-                description: 'What is the main characteristic of a `ThreadLocal` variable?<br/>```java\nThreadLocal<Integer> userContext = new ThreadLocal<>();\nuserContext.set(123);\n```',
+                description: 'What is the main characteristic of a `ThreadLocal` variable?<br/><pre><code>ThreadLocal<Integer> userContext = new ThreadLocal<>();\nuserContext.set(123);</code></pre>',
                 type: 'mcq',
                 difficulty: 'medium',
                 createdAt: new Date(),
@@ -325,7 +325,7 @@ export async function seedQuizAction() {
             {
                 
                 title: '`AtomicInteger` Output',
-                description: 'Two threads call `increment()` on the same `Counter` instance 1000 times each. What is a possible final value of `count`?<br/>```java\nclass Counter {\n    private AtomicInteger count = new AtomicInteger(0);\n    public void increment() {\n        count.incrementAndGet();\n    }\n    public int getCount() { return count.get(); }\n}\n```',
+                description: 'Two threads call `increment()` on the same `Counter` instance 1000 times each. What is a possible final value of `count`?<br/><pre><code>class Counter {\n    private AtomicInteger count = new AtomicInteger(0);\n    public void increment() {\n        count.incrementAndGet();\n    }\n    public int getCount() { return count.get(); }\n}</code></pre>',
                 type: 'mcq',
                 difficulty: 'medium',
                 createdAt: new Date(),
@@ -355,7 +355,7 @@ export async function seedQuizAction() {
             {
                 
                 title: '`CompletableFuture.thenCombine`',
-                description: 'What is the purpose of `thenCombine` in this example?<br/>```java\nCompletableFuture<String> future1 = ...;\nCompletableFuture<String> future2 = ...;\nCompletableFuture<String> combined = future1.thenCombine(future2, (res1, res2) -> res1 + res2);\n```',
+                description: 'What is the purpose of `thenCombine` in this example?<br/><pre><code>CompletableFuture<String> future1 = ...;\nCompletableFuture<String> future2 = ...;\nCompletableFuture<String> combined = future1.thenCombine(future2, (res1, res2) -> res1 + res2);</code></pre>',
                 type: 'mcq',
                 difficulty: 'hard',
                 createdAt: new Date(),
@@ -424,7 +424,7 @@ class Solution {
             {
                 
                 title: '`ForkJoinPool` Summation',
-                description: 'What is the likely output of this `ForkJoinPool` code?<br/>```java\nclass Sum extends RecursiveTask<Long> { ... } // Assume correct implementation\n\nForkJoinPool pool = ForkJoinPool.commonPool();\nlong total = pool.invoke(new Sum(array, 0, array.length));\nSystem.out.println(total);\n```',
+                description: 'What is the likely output of this `ForkJoinPool` code?<br/><pre><code>class Sum extends RecursiveTask<Long> { ... } // Assume correct implementation\n\nForkJoinPool pool = ForkJoinPool.commonPool();\nlong total = pool.invoke(new Sum(array, 0, array.length));\nSystem.out.println(total);</code></pre>',
                 type: 'mcq',
                 difficulty: 'hard',
                 createdAt: new Date(),
@@ -484,7 +484,7 @@ class Solution {
             {
                 
                 title: '`synchronized` block output',
-                description: 'What is a possible output of this program?<br/>```java\npublic class Test {\n    public static void main(String[] args) {\n        Object lock = new Object();\n        new Thread(() -> {\n            synchronized(lock) {\n                System.out.print("A");\n                try { lock.wait(); } catch (InterruptedException e) {}\n                System.out.print("B");\n            }\n        }).start();\n        new Thread(() -> {\n            synchronized(lock) {\n                System.out.print("C");\n                lock.notify();\n            }\n        }).start();\n    }\n}\n```',
+                description: 'What is a possible output of this program?<br/><pre><code>public class Test {\n    public static void main(String[] args) {\n        Object lock = new Object();\n        new Thread(() -> {\n            synchronized(lock) {\n                System.out.print("A");\n                try { lock.wait(); } catch (InterruptedException e) {}\n                System.out.print("B");\n            }\n        }).start();\n        new Thread(() -> {\n            synchronized(lock) {\n                System.out.print("C");\n                lock.notify();\n            }\n        }).start();\n    }\n}</code></pre>',
                 type: 'mcq',
                 difficulty: 'hard',
                 createdAt: new Date(),
@@ -538,7 +538,7 @@ class Solution {
             {
                 
                 title: '`CompletableFuture` Exception Handling',
-                description: 'What is printed by the following code?<br/>```java\nCompletableFuture.supplyAsync(() -> {\n    if (true) throw new RuntimeException("Error!");\n    return "Success";\n}).exceptionally(ex -> {\n    System.out.print(ex.getMessage());\n    return "Fallback";\n}).thenAccept(System.out::print);\n```',
+                description: 'What is printed by the following code?<br/><pre><code>CompletableFuture.supplyAsync(() -> {\n    if (true) throw new RuntimeException("Error!");\n    return "Success";\n}).exceptionally(ex -> {\n    System.out.print(ex.getMessage());\n    return "Fallback";\n}).thenAccept(System.out::print);</code></pre>',
                 type: 'mcq',
                 difficulty: 'hard',
                 createdAt: new Date(),
@@ -625,5 +625,7 @@ class Solution {
         return { success: false, message: error.message || "An unexpected error occurred during quiz seeding." };
     }
 }
+
+    
 
     
