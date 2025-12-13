@@ -27,6 +27,7 @@ export interface Quiz {
     createdAt: Date;
     isPublic: boolean;
     difficulty?: "easy" | "medium" | "hard";
+    totalMarks?: number;
 }
 
 export type QuestionType = "mcq" | "coding";
@@ -38,6 +39,7 @@ export interface BaseQuestion {
     type: QuestionType;
     difficulty: "easy" | "medium" | "hard";
     createdAt: Date;
+    mark: number;
     // New property for image-based questions
     imageUrl?: string;
 }

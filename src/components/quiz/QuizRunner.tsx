@@ -57,9 +57,11 @@ export default function QuizRunner({ quiz, questions, session }: QuizRunnerProps
             
             let questionScore = 0;
             let status: QuestionResult['status'] = "incorrect";
+            const questionTotalMarks = q.mark || 10;
+            
             let questionResult: Partial<QuestionResult> = {
                 userAnswer: userAnswer || "",
-                total: 10,
+                total: questionTotalMarks,
             };
 
             if (!userAnswer || userAnswer.trim() === '') {
@@ -69,7 +71,7 @@ export default function QuizRunner({ quiz, questions, session }: QuizRunnerProps
                 const mcq = q as MCQQuestion;
                 const isCorrect = userAnswer === mcq.correctOptionIndex.toString();
                 if (isCorrect) {
-                    questionScore = 10;
+                    questionScore = questionTotalMarks;
                     status = 'correct';
                 } else {
                     questionScore = 0;
@@ -82,9 +84,11 @@ export default function QuizRunner({ quiz, questions, session }: QuizRunnerProps
                 const passedTests = executionResult.test_case_results?.filter(r => r.passed).length || 0;
                 const totalTests = codingQ.testCases.length;
                 
-                questionScore = totalTests > 0 ? Math.round((passedTests / totalTests) * 10) : 0;
+                questionScore = totalTests > 0 ? Math.round((passedTests / totalTests) * questionTotalMarks) : 0;
                 
-                questionResult.testCaseResults = executionResult.test_case_results;
+                if (executionResult.test_case_results) {
+                    questionResult.testCaseResults = executionResult.test_case_results;
+                }
                 
                 if (passedTests === totalTests && totalTests > 0) {
                     status = 'correct';
@@ -96,13 +100,16 @@ export default function QuizRunner({ quiz, questions, session }: QuizRunnerProps
             }
             
             totalQuizScore += questionScore;
-            maxQuizScore += 10; 
+            maxQuizScore += questionTotalMarks; 
 
-            questionResult.score = questionScore;
-            questionResult.status = status;
-            questionResult.questionId = q.id;
-            
-            finalAnswers[q.id] = questionResult as QuestionResult;
+            finalAnswers[q.id] = {
+                questionId: q.id,
+                score: questionScore,
+                status: status,
+                userAnswer: userAnswer || "",
+                total: questionTotalMarks,
+                testCaseResults: questionResult.testCaseResults,
+            };
         }
 
         const batch = writeBatch(db);

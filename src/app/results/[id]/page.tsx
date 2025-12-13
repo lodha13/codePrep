@@ -202,7 +202,7 @@ export default function ResultPage() {
                             <div className="flex justify-between items-start mb-4">
                                 <h3 className="text-lg font-semibold">Question {index + 1}: {question.title}</h3>
                                 <div className="font-bold text-lg text-right flex-shrink-0 ml-4">
-                                    {ans.score ?? 0} / {ans.total ?? 10} pts
+                                    {ans.score ?? 0} / {ans.total} pts
                                 </div>
                             </div>
                             <div className="flex items-start gap-4">

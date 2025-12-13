@@ -43,15 +43,18 @@ export async function generateQuizAction(prevState: any, formData: FormData) {
     // 1. Create and batch-write all the questions
     const questionsCollection = collection(db, 'questions');
     const questionIds: string[] = [];
+    let totalMarks = 0;
 
     questionsData.forEach((q) => {
         const questionRef = doc(questionsCollection); // Auto-generate ID
         questionIds.push(questionRef.id);
         const questionPayload: Omit<Question, 'id' | 'createdAt'> & { createdAt: any } = {
             ...q,
+            mark: q.difficulty === 'easy' ? 5 : q.difficulty === 'medium' ? 10 : 15,
             // @ts-ignore
             createdAt: serverTimestamp(),
         };
+        totalMarks += questionPayload.mark;
         batch.set(questionRef, questionPayload);
     });
 
@@ -64,6 +67,7 @@ export async function generateQuizAction(prevState: any, formData: FormData) {
         questionIds: questionIds,
         isPublic: true, // Default to public
         type: 'assessment',
+        totalMarks: totalMarks,
         createdAt: serverTimestamp(),
         // Mock createdBy until proper user association is implemented
         createdBy: 'ai-generator', 
@@ -84,16 +88,18 @@ export async function generateQuizAction(prevState: any, formData: FormData) {
 export async function seedQuizAction() {
     try {
         const batch = writeBatch(db);
+        const questionMark = 10;
+        let totalMarks = 0;
 
         // --- Questions Data ---
         const questions: (Omit<MCQQuestion, 'id'> | Omit<CodingQuestion, 'id'>)[] = [
             {
-                
                 title: 'ExecutorService Shutdown Behavior',
                 description: 'What happens if you submit a new task to an `ExecutorService` after `shutdown()` has been called? <br/><pre><code>ExecutorService executor = Executors.newSingleThreadExecutor();\nexecutor.shutdown();\nFuture<String> future = executor.submit(() -> "Task after shutdown");</code></pre>',
                 type: 'mcq',
                 difficulty: 'medium',
                 createdAt: new Date(),
+                mark: questionMark,
                 options: [
                     'The task is queued and will run after currently running tasks complete.',
                     'A `RejectedExecutionException` is thrown.',
@@ -103,12 +109,12 @@ export async function seedQuizAction() {
                 correctOptionIndex: 1,
             },
             {
-                
                 title: '`volatile` Keyword Guarantee',
                 description: 'A shared variable is declared as `volatile`. What does the `volatile` keyword primarily guarantee?<br/><pre><code>private volatile boolean flag = false;\n\n// Thread A\nflag = true;\n\n// Thread B\nif (flag) {\n  // do something\n}</code></pre>',
                 type: 'mcq',
                 difficulty: 'medium',
                 createdAt: new Date(),
+                mark: questionMark,
                 options: [
                     'Atomicity of compound actions (like incrementing).',
                     'That reads and writes are directly from/to main memory (visibility).',
@@ -118,12 +124,12 @@ export async function seedQuizAction() {
                 correctOptionIndex: 1,
             },
             {
-                
                 title: '`ReentrantLock` vs `synchronized`',
                 description: 'Which of the following is a feature of `ReentrantLock` that is NOT available with the `synchronized` keyword?',
                 type: 'mcq',
                 difficulty: 'medium',
                 createdAt: new Date(),
+                mark: questionMark,
                 options: [
                     'The ability to be re-entered by the same thread.',
                     'The ability to be fair (first-come, first-served).',
@@ -133,12 +139,12 @@ export async function seedQuizAction() {
                 correctOptionIndex: 1,
             },
             {
-                
                 title: '`CompletableFuture` Output',
                 description: 'What is the output of the following `CompletableFuture` code?<br/><pre><code>CompletableFuture.supplyAsync(() -> "Hello")\n    .thenApplyAsync(s -> s + " World")\n    .thenAccept(System.out::print)\n    .join();\nSystem.out.print(" from Main");</code></pre>',
                 type: 'mcq',
                 difficulty: 'hard',
                 createdAt: new Date(),
+                mark: questionMark,
                 options: [
                     'Hello World from Main',
                     'from MainHello World',
@@ -148,12 +154,12 @@ export async function seedQuizAction() {
                 correctOptionIndex: 0,
             },
             {
-                
                 title: '`Thread.join()` Behavior',
                 description: 'What is the purpose of `t.join()` in the following code?<br/><pre><code>Thread t = new Thread(() -> {\n    // some long-running task\n});\nt.start();\nt.join(); // What does this line do?\nSystem.out.println("Main thread finished.");</code></pre>',
                 type: 'mcq',
                 difficulty: 'easy',
                 createdAt: new Date(),
+                mark: questionMark,
                 options: [
                     'It starts the execution of thread `t`.',
                     'It interrupts the execution of thread `t`.',
@@ -163,12 +169,12 @@ export async function seedQuizAction() {
                 correctOptionIndex: 2,
             },
             {
-                
                 title: '`ConcurrentHashMap` Atomicity',
                 description: 'Which operation is atomic in `ConcurrentHashMap`?<br/><pre><code>ConcurrentHashMap<String, Integer> map = new ConcurrentHashMap<>();</code></pre>',
                 type: 'mcq',
                 difficulty: 'medium',
                 createdAt: new Date(),
+                mark: questionMark,
                 options: [
                     '`map.put("key", 1);`',
                     '`if (!map.containsKey("key")) { map.put("key", 1); }`',
@@ -178,12 +184,12 @@ export async function seedQuizAction() {
                 correctOptionIndex: 2,
             },
             {
-                
                 title: '`CountDownLatch` Usage',
                 description: 'What will be printed to the console?<br/><pre><code>CountDownLatch latch = new CountDownLatch(2);\nnew Thread(() -> {\n    System.out.print("A");\n    latch.countDown();\n}).start();\nnew Thread(() -> {\n    System.out.print("B");\n    latch.countDown();\n}).start();\nlatch.await();\nSystem.out.print("C");</code></pre>',
                 type: 'mcq',
                 difficulty: 'hard',
                 createdAt: new Date(),
+                mark: questionMark,
                 options: [
                     'ABC',
                     'BAC',
@@ -193,12 +199,12 @@ export async function seedQuizAction() {
                 correctOptionIndex: 3,
             },
             {
-                
                 title: '`Callable` vs `Runnable`',
                 description: 'What is the key difference between `Callable` and `Runnable`?',
                 type: 'mcq',
                 difficulty: 'easy',
                 createdAt: new Date(),
+                mark: questionMark,
                 options: [
                     '`Runnable` can throw checked exceptions, `Callable` cannot.',
                     '`Callable` can return a value, `Runnable` cannot.',
@@ -208,12 +214,12 @@ export async function seedQuizAction() {
                 correctOptionIndex: 1,
             },
             {
-                
                 title: '`synchronized` method output',
                 description: 'Given two threads calling `increment()` on the same `Counter` instance, what is the final value of `count`?<br/><pre><code>class Counter {\n    private int count = 0;\n    public synchronized void increment() {\n        count++;\n    }\n    public int getCount() { return count; }\n}\n// Two threads call increment() 1000 times each.</code></pre>',
                 type: 'mcq',
                 difficulty: 'medium',
                 createdAt: new Date(),
+                mark: questionMark,
                 options: [
                     'A value less than 2000.',
                     '2000',
@@ -223,12 +229,12 @@ export async function seedQuizAction() {
                 correctOptionIndex: 1,
             },
             {
-                
                 title: 'Deadlock Condition',
                 description: 'Two threads, T1 and T2, need to acquire locks on two resources, R1 and R2. T1 acquires R1, then R2. T2 acquires R2, then R1. What condition does this scenario describe?',
                 type: 'mcq',
                 difficulty: 'medium',
                 createdAt: new Date(),
+                mark: questionMark,
                 options: [
                     'Race Condition',
                     'Livelock',
@@ -238,12 +244,12 @@ export async function seedQuizAction() {
                 correctOptionIndex: 3,
             },
             {
-                
                 title: '`Future.get()` Behavior',
                 description: 'What happens when `future.get()` is called?<br/><pre><code>ExecutorService executor = Executors.newSingleThreadExecutor();\nFuture<String> future = executor.submit(() -> {\n    Thread.sleep(2000);\n    return "Ready";\n});\nString result = future.get(); // This line</code></pre>',
                 type: 'mcq',
                 difficulty: 'medium',
                 createdAt: new Date(),
+                mark: questionMark,
                 options: [
                     'It returns `null` immediately if the task is not complete.',
                     'It throws an `IllegalStateException` if the task is not complete.',
@@ -253,22 +259,22 @@ export async function seedQuizAction() {
                 correctOptionIndex: 2,
             },
             {
-                
                 title: '`Semaphore` for Resource Limiting',
                 description: 'A `Semaphore` is initialized with `new Semaphore(3)`. How many threads can acquire a permit simultaneously without blocking?',
                 type: 'mcq',
                 difficulty: 'easy',
                 createdAt: new Date(),
+                mark: questionMark,
                 options: ['1', '2', '3', 'Unlimited'],
                 correctOptionIndex: 2,
             },
             {
-                
                 title: '`Executors.newCachedThreadPool()` Behavior',
                 description: 'You create an `ExecutorService` using `Executors.newCachedThreadPool()`. You submit 100 tasks to it simultaneously. What is the most likely behavior?',
                 type: 'mcq',
                 difficulty: 'hard',
                 createdAt: new Date(),
+                mark: questionMark,
                 options: [
                     'It will create a fixed number of threads (e.g., 10) and queue the rest of the tasks.',
                     'It will create up to 100 threads (or as many as the system can handle) to execute the tasks concurrently.',
@@ -278,12 +284,12 @@ export async function seedQuizAction() {
                 correctOptionIndex: 1,
             },
             {
-                
                 title: '`ThreadLocal` Variable Scope',
                 description: 'What is the main characteristic of a `ThreadLocal` variable?<br/><pre><code>ThreadLocal<Integer> userContext = new ThreadLocal<>();\nuserContext.set(123);</code></pre>',
                 type: 'mcq',
                 difficulty: 'medium',
                 createdAt: new Date(),
+                mark: questionMark,
                 options: [
                     'It is shared among all threads.',
                     'It is accessible only by the thread that created it.',
@@ -293,12 +299,12 @@ export async function seedQuizAction() {
                 correctOptionIndex: 2,
             },
             {
-                
                 title: 'Daemon Thread Behavior',
                 description: 'If all remaining running threads in a Java application are daemon threads, what happens?',
                 type: 'mcq',
                 difficulty: 'medium',
                 createdAt: new Date(),
+                mark: questionMark,
                 options: [
                     'The application waits for the daemon threads to complete.',
                     'The application throws an `IllegalThreadStateException`.',
@@ -308,12 +314,12 @@ export async function seedQuizAction() {
                 correctOptionIndex: 2,
             },
             {
-                
                 title: '`wait()` and `notifyAll()`',
                 description: 'A thread calls `wait()` on an object. What must be true for this to work correctly?',
                 type: 'mcq',
                 difficulty: 'medium',
                 createdAt: new Date(),
+                mark: questionMark,
                 options: [
                     'The thread must be a daemon thread.',
                     'The thread must own the intrinsic lock of the object.',
@@ -323,12 +329,12 @@ export async function seedQuizAction() {
                 correctOptionIndex: 1,
             },
             {
-                
                 title: '`AtomicInteger` Output',
                 description: 'Two threads call `increment()` on the same `Counter` instance 1000 times each. What is a possible final value of `count`?<br/><pre><code>class Counter {\n    private AtomicInteger count = new AtomicInteger(0);\n    public void increment() {\n        count.incrementAndGet();\n    }\n    public int getCount() { return count.get(); }\n}</code></pre>',
                 type: 'mcq',
                 difficulty: 'medium',
                 createdAt: new Date(),
+                mark: questionMark,
                 options: [
                     'A value less than 2000.',
                     '2000',
@@ -338,12 +344,12 @@ export async function seedQuizAction() {
                 correctOptionIndex: 1,
             },
             {
-                
                 title: '`CyclicBarrier` vs `CountDownLatch`',
                 description: 'What is a key difference between `CyclicBarrier` and `CountDownLatch`?',
                 type: 'mcq',
                 difficulty: 'hard',
                 createdAt: new Date(),
+                mark: questionMark,
                 options: [
                     '`CountDownLatch` can be reset and reused, `CyclicBarrier` cannot.',
                     '`CyclicBarrier` can be reset and reused, `CountDownLatch` cannot.',
@@ -353,12 +359,12 @@ export async function seedQuizAction() {
                 correctOptionIndex: 1,
             },
             {
-                
                 title: '`CompletableFuture.thenCombine`',
                 description: 'What is the purpose of `thenCombine` in this example?<br/><pre><code>CompletableFuture<String> future1 = ...;\nCompletableFuture<String> future2 = ...;\nCompletableFuture<String> combined = future1.thenCombine(future2, (res1, res2) -> res1 + res2);</code></pre>',
                 type: 'mcq',
                 difficulty: 'hard',
                 createdAt: new Date(),
+                mark: questionMark,
                 options: [
                     'It runs the second future after the first one completes.',
                     'It runs when either of the two futures completes.',
@@ -368,12 +374,12 @@ export async function seedQuizAction() {
                 correctOptionIndex: 2,
             },
             {
-                
                 title: '`StampedLock` Read-Write Behavior',
                 description: 'Why might a read operation using `tryOptimisticRead()` on a `StampedLock` need to be retried with a full read lock?',
                 type: 'mcq',
                 difficulty: 'hard',
                 createdAt: new Date(),
+                mark: questionMark,
                 options: [
                     'Because optimistic reads are not thread-safe.',
                     'Because the lock might have been exclusively locked by a writer between the time the optimistic read stamp was obtained and the read was finished.',
@@ -383,13 +389,13 @@ export async function seedQuizAction() {
                 correctOptionIndex: 1,
             },
             {
-                
                 title: 'Find Prime Numbers with ExecutorService',
                 description: 'Complete the `findPrimes` method. It should use an `ExecutorService` to check for primality of numbers in a given range in parallel. The method should return a list of all prime numbers found.',
                 type: 'coding',
                 difficulty: 'hard',
                 language: 'java',
                 createdAt: new Date(),
+                mark: questionMark,
                 starterCode: `import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -422,12 +428,12 @@ class Solution {
                 ],
             },
             {
-                
                 title: '`ForkJoinPool` Summation',
                 description: 'What is the likely output of this `ForkJoinPool` code?<br/><pre><code>class Sum extends RecursiveTask<Long> { ... } // Assume correct implementation\n\nForkJoinPool pool = ForkJoinPool.commonPool();\nlong total = pool.invoke(new Sum(array, 0, array.length));\nSystem.out.println(total);</code></pre>',
                 type: 'mcq',
                 difficulty: 'hard',
                 createdAt: new Date(),
+                mark: questionMark,
                 options: [
                     'The sum of the elements in the array.',
                     'The code will not compile without a `RecursiveAction`.',
@@ -437,12 +443,12 @@ class Solution {
                 correctOptionIndex: 0,
             },
             {
-                
                 title: '`InterruptedException` Handling',
                 description: 'A thread is blocked in `Thread.sleep()`. Another thread calls `interrupt()` on it. What happens?',
                 type: 'mcq',
                 difficulty: 'medium',
                 createdAt: new Date(),
+                mark: questionMark,
                 options: [
                     'The sleeping thread immediately stops execution.',
                     'The `sleep()` method throws an `InterruptedException`.',
@@ -452,12 +458,12 @@ class Solution {
                 correctOptionIndex: 1,
             },
             {
-                
                 title: '`ReadWriteLock` Purpose',
                 description: 'When is it most beneficial to use a `ReadWriteLock` over a standard `ReentrantLock`?',
                 type: 'mcq',
                 difficulty: 'medium',
                 createdAt: new Date(),
+                mark: questionMark,
                 options: [
                     'When the number of write operations is much higher than read operations.',
                     'When the number of read operations is much higher than write operations.',
@@ -467,12 +473,12 @@ class Solution {
                 correctOptionIndex: 1,
             },
             {
-                
                 title: '`BlockingQueue` `put` method',
                 description: 'You call the `put()` method on a `BlockingQueue` that is currently full. What is the behavior of the calling thread?',
                 type: 'mcq',
                 difficulty: 'medium',
                 createdAt: new Date(),
+                mark: questionMark,
                 options: [
                     'It returns `false` immediately.',
                     'It throws an `IllegalStateException`.',
@@ -482,12 +488,12 @@ class Solution {
                 correctOptionIndex: 2,
             },
             {
-                
                 title: '`synchronized` block output',
                 description: 'What is a possible output of this program?<br/><pre><code>public class Test {\n    public static void main(String[] args) {\n        Object lock = new Object();\n        new Thread(() -> {\n            synchronized(lock) {\n                System.out.print("A");\n                try { lock.wait(); } catch (InterruptedException e) {}\n                System.out.print("B");\n            }\n        }).start();\n        new Thread(() -> {\n            synchronized(lock) {\n                System.out.print("C");\n                lock.notify();\n            }\n        }).start();\n    }\n}</code></pre>',
                 type: 'mcq',
                 difficulty: 'hard',
                 createdAt: new Date(),
+                mark: questionMark,
                 options: [
                     'ACB',
                     'CAB',
@@ -497,13 +503,13 @@ class Solution {
                 correctOptionIndex: 0,
             },
             {
-                
                 title: 'Producer-Consumer with BlockingQueue',
                 description: 'Implement the `Producer` and `Consumer` logic using the provided `BlockingQueue`. The `Producer` should add the numbers 1 through 10 to the queue. The `Consumer` should retrieve all 10 numbers and add them to its `consumedItems` list.',
                 type: 'coding',
                 difficulty: 'hard',
                 language: 'java',
                 createdAt: new Date(),
+                mark: questionMark,
                 starterCode: `import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ArrayBlockingQueue;
@@ -536,12 +542,12 @@ class Solution {
                 ],
             },
             {
-                
                 title: '`CompletableFuture` Exception Handling',
                 description: 'What is printed by the following code?<br/><pre><code>CompletableFuture.supplyAsync(() -> {\n    if (true) throw new RuntimeException("Error!");\n    return "Success";\n}).exceptionally(ex -> {\n    System.out.print(ex.getMessage());\n    return "Fallback";\n}).thenAccept(System.out::print);</code></pre>',
                 type: 'mcq',
                 difficulty: 'hard',
                 createdAt: new Date(),
+                mark: questionMark,
                 options: [
                     'Success',
                     'Error!Fallback',
@@ -551,12 +557,12 @@ class Solution {
                 correctOptionIndex: 1,
             },
             {
-                
                 title: 'Thread Pool Saturation Policy',
                 description: 'You create a `ThreadPoolExecutor` with a fixed-size pool, a bounded queue, and the default `AbortPolicy`. What happens when the pool, the queue, and the max pool size are all saturated, and a new task is submitted?',
                 type: 'mcq',
                 difficulty: 'hard',
                 createdAt: new Date(),
+                mark: questionMark,
                 options: [
                     'The new task is run in the calling thread.',
                     'The oldest task in the queue is discarded.',
@@ -566,12 +572,12 @@ class Solution {
                 correctOptionIndex: 2,
             },
             {
-                
                 title: '`volatile` vs `AtomicInteger`',
                 description: 'For a simple counter variable `i` that needs to be incremented by multiple threads, why is `AtomicInteger` preferred over a `volatile int`?',
                 type: 'mcq',
                 difficulty: 'medium',
                 createdAt: new Date(),
+                mark: questionMark,
                 options: [
                     '`volatile int` is slower.',
                     '`volatile` does not guarantee atomicity for the increment operation (read-modify-write).',
@@ -595,6 +601,7 @@ class Solution {
             createdAt: new Date(),
             isPublic: true,
             difficulty: 'hard',
+            totalMarks: questions.reduce((sum, q) => sum + (q.mark || 0), 0),
             // @ts-ignore
             createdBy: 'seed-script'
         };
@@ -625,7 +632,3 @@ class Solution {
         return { success: false, message: error.message || "An unexpected error occurred during quiz seeding." };
     }
 }
-
-    
-
-    

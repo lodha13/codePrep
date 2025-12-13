@@ -18,6 +18,7 @@ const QuestionSchema = z.discriminatedUnion('type', [
     description: z.string().describe("The question text, in HTML format."),
     type: z.literal('mcq'),
     difficulty: z.enum(['easy', 'medium', 'hard']),
+    mark: z.number().int().describe("The points awarded for a correct answer."),
     options: z.array(z.string()).min(4).max(4).describe("An array of exactly 4 potential answers."),
     correctOptionIndex: z.number().min(0).max(3).describe("The 0-based index of the correct option."),
   }),
@@ -26,6 +27,7 @@ const QuestionSchema = z.discriminatedUnion('type', [
     description: z.string().describe("A detailed description of the coding challenge, in HTML format."),
     type: z.literal('coding'),
     difficulty: z.enum(['easy', 'medium', 'hard']),
+    mark: z.number().int().describe("The points awarded for a correct answer."),
     language: z.literal('java').describe("The programming language for the challenge, always 'java'."),
     starterCode: z.string().describe("The boilerplate code to provide to the user."),
     testCases: z.array(TestCaseSchema).min(3).describe("An array of at least 3 test cases."),
@@ -73,7 +75,8 @@ const prompt = ai.definePrompt({
     4.  MCQ questions must have exactly 4 options.
     5.  Coding questions must have at least 10 test cases, including edge cases. At least one test case must be hidden.
     6.  All descriptions for questions must be in well-formatted HTML. Use <br/> for line breaks and <code><pre>...</pre></code> for code blocks.
-    7.  The final output MUST be a single JSON object that strictly adheres to the provided output schema. Do not include any text or formatting outside of the JSON object.
+    7.  Assign marks based on difficulty: easy = 5, medium = 10, hard = 15.
+    8.  The final output MUST be a single JSON object that strictly adheres to the provided output schema. Do not include any text or formatting outside of the JSON object.
     `,
     config: {
         model: googleAI.model('gemini-1.5-pro-preview'),

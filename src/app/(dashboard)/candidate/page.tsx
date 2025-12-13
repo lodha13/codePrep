@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
@@ -90,7 +91,7 @@ export default function CandidateDashboard() {
                                         <div>
                                             <h3 className="text-lg font-semibold">{quiz.title}</h3>
                                             <p className="text-sm text-muted-foreground mt-1">
-                                                <span>{quiz.difficulty || 'Easy'}</span> • <span>Max Score: {quiz.questionIds.length * 10}</span>
+                                                <span>{quiz.difficulty || 'Easy'}</span> • <span>Max Score: {quiz.totalMarks || quiz.questionIds.length * 10}</span>
                                             </p>
                                         </div>
                                         <Button asChild variant="outline">
