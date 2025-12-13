@@ -25,8 +25,10 @@ export default function ProfilePage() {
             };
 
             setLoading(true);
+            // Correctly query the root 'results' collection for the user's completed tests.
             const resultsQuery = query(
-                collection(db, 'users', user.uid, 'testResults'),
+                collection(db, 'results'),
+                where('userId', '==', user.uid),
                 where('status', '==', 'completed')
             );
             
