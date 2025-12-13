@@ -187,7 +187,7 @@ export default function ResultPage() {
 
             <div className="space-y-4">
                 <h2 className="text-2xl font-bold font-headline">Detailed Breakdown</h2>
-                {Object.entries(result.answers).map(([questionId, ans]) => {
+                {Object.entries(result.answers).map(([questionId, ans], index) => {
                     const question = questions[questionId];
                     if (!question) return (
                         <Card key={questionId} className="p-4">
@@ -196,22 +196,20 @@ export default function ResultPage() {
                     );
 
                     return (
-                        <Card key={questionId} className="p-4">
-                            <div className="flex justify-between items-start">
-                                    <div className="flex items-start gap-4">
-                                    {getStatusIcon(ans.status)}
-                                    <div className="prose prose-sm max-w-none">
-                                        <p className="font-semibold mb-2">{question.title}</p>
-                                        <div dangerouslySetInnerHTML={{ __html: question.description }} />
-                                    </div>
-                                </div>
+                        <Card key={questionId} className="p-6">
+                            <div className="flex justify-between items-start mb-4">
+                                <h3 className="text-lg font-semibold">Question {index + 1}: {question.title}</h3>
                                 <div className="font-bold text-lg text-right flex-shrink-0 ml-4">
                                     {ans.score} / {ans.total} pts
                                 </div>
                             </div>
-                            <div className="mt-2 pl-10">
-                                {question.type === 'mcq' && renderMCQResult(ans, question as MCQQuestion)}
-                                {question.type === 'coding' && renderCodingResult(ans, question as CodingQuestion)}
+                            <div className="flex items-start gap-4">
+                                {getStatusIcon(ans.status)}
+                                <div className="flex-1">
+                                    <div className="prose prose-sm max-w-none mb-4" dangerouslySetInnerHTML={{ __html: question.description }} />
+                                    {question.type === 'mcq' && renderMCQResult(ans, question as MCQQuestion)}
+                                    {question.type === 'coding' && renderCodingResult(ans, question as CodingQuestion)}
+                                </div>
                             </div>
                         </Card>
                     );
@@ -220,3 +218,5 @@ export default function ResultPage() {
         </div>
     );
 }
+
+    
