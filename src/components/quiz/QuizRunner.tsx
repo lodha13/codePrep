@@ -57,11 +57,11 @@ export default function QuizRunner({ quiz, questions, session }: QuizRunnerProps
             
             let questionScore = 0;
             let status: QuestionResult['status'] = "unanswered";
-            const questionTotalMarks = q.mark;
+            // Safeguard: Use a default mark of 0 if it's missing from the question data.
+            const questionTotalMarks = q.mark || 0;
             
             let questionResult: Partial<QuestionResult> = {
                 userAnswer: userAnswer || "",
-                total: questionTotalMarks,
             };
 
             if (userAnswer && userAnswer.trim() !== '') {
@@ -112,6 +112,7 @@ export default function QuizRunner({ quiz, questions, session }: QuizRunnerProps
                 status: status,
                 total: questionTotalMarks,
                 ...(userAnswer && { userAnswer: userAnswer }),
+                // Only include testCaseResults if they exist
                 ...(questionResult.testCaseResults && { testCaseResults: questionResult.testCaseResults }),
             };
         }
