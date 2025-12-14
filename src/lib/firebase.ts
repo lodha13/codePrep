@@ -27,4 +27,35 @@ if (!getApps().length) {
 const auth = getAuth(app);
 const db = getFirestore(app);
 
+// Helper function to get or create a unique quiz session
+export async function getOrCreateQuizSession(userId: string, quizId: string, quizTitle: string) {
+    const { doc, getDoc, setDoc, Timestamp } = await import('firebase/firestore');
+    
+    // Use composite ID to ensure uniqueness: userId_quizId
+    const sessionId = `${userId}_${quizId}`;
+    const sessionRef = doc(db, "results", sessionId);
+    
+    // Try to get existing session
+    const existingDoc = await getDoc(sessionRef);
+    
+    if (existingDoc.exists()) {
+        return { id: existingDoc.id, ...existingDoc.data() };
+    }
+    
+    // Create new session with fixed ID
+    const newSessionData = {
+        quizId,
+        quizTitle,
+        userId,
+        startedAt: Timestamp.now(),
+        status: 'in-progress' as const,
+        score: 0,
+        totalScore: 0,
+        answers: {},
+    };
+    
+    await setDoc(sessionRef, newSessionData);
+    return { id: sessionId, ...newSessionData };
+}
+
 export { app, auth, db };

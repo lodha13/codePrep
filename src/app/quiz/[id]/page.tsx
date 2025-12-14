@@ -3,8 +3,8 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import { doc, getDoc, getDocs, collection, query, where, documentId, addDoc, Timestamp } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { doc, getDoc, getDocs, collection, query, where, documentId } from "firebase/firestore";
+import { db, getOrCreateQuizSession } from "@/lib/firebase";
 import { Quiz, Question, QuizResult } from "@/types/schema";
 import QuizRunner from "@/components/quiz/QuizRunner";
 import { useAuth } from "@/context/AuthContext";
@@ -27,67 +27,33 @@ export default function QuizPage() {
 
             setLoading(true);
 
-            // 1. Check if the user has already COMPLETED this quiz using the user document.
+            // 1. Check if the user has already COMPLETED this quiz
             if (user.completedQuizIds?.includes(quizId as string)) {
                  setAlreadyCompleted(true);
                  setLoading(false);
                  return;
             }
 
+            // 2. Fetch quiz data first
+            const quizRef = doc(db, "quizzes", quizId as string);
+            const quizSnap = await getDoc(quizRef);
 
-            // 2. Check for an IN-PROGRESS session
-            const inProgressQuery = query(
-                collection(db, "results"),
-                where("userId", "==", user.uid),
-                where("quizId", "==", quizId as string),
-                where("status", "==", "in-progress")
-            );
-            const sessionSnap = await getDocs(inProgressQuery);
+            if (!quizSnap.exists()) {
+                setLoading(false);
+                return; // Quiz not found
+            }
+            
+            const currentQuiz = { id: quizSnap.id, ...quizSnap.data() } as Quiz;
+            setQuiz(currentQuiz);
 
-            let session: QuizResult;
-            let currentQuiz: Quiz;
-
-            if (sessionSnap.empty) {
-                // 3. If no session, fetch quiz data to create a new one
-                const quizRef = doc(db, "quizzes", quizId as string);
-                const quizSnap = await getDoc(quizRef);
-
-                if (!quizSnap.exists()) {
-                    setLoading(false);
-                    return; // Quiz not found
-                }
-                currentQuiz = { id: quizSnap.id, ...quizSnap.data() } as Quiz;
-                setQuiz(currentQuiz);
-
-                // Create a new session document
-                const newSessionData: Omit<QuizResult, 'id'> = {
-                    quizId: currentQuiz.id,
-                    quizTitle: currentQuiz.title,
-                    userId: user.uid,
-                    startedAt: Timestamp.now(),
-                    status: 'in-progress',
-                    score: 0,
-                    totalScore: 0,
-                    answers: {},
-                };
-                const sessionRef = await addDoc(collection(db, "results"), newSessionData);
-                session = { id: sessionRef.id, ...newSessionData };
-            } else {
-                // 4. If session exists, use it
-                const sessionDoc = sessionSnap.docs[0];
-                session = { id: sessionDoc.id, ...sessionDoc.data() } as QuizResult;
-
-                // Also fetch quiz data if not already fetched
-                const quizRef = doc(db, "quizzes", quizId as string);
-                const quizSnap = await getDoc(quizRef);
-                if (quizSnap.exists()) {
-                    currentQuiz = { id: quizSnap.id, ...quizSnap.data() } as Quiz;
-                    setQuiz(currentQuiz);
-                } else {
-                    // This case should ideally not happen if a session exists
-                    setLoading(false);
-                    return;
-                }
+            // 3. Get or create session using helper function
+            const session = await getOrCreateQuizSession(user.uid, quizId as string, currentQuiz.title) as QuizResult;
+            
+            // 4. Double-check if session is completed (in case of race condition)
+            if (session.status === 'completed') {
+                setAlreadyCompleted(true);
+                setLoading(false);
+                return;
             }
 
             setQuizSession(session);

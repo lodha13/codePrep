@@ -122,7 +122,8 @@ export default function QuizRunner({ quiz, questions, session }: QuizRunnerProps
 
         const resultDocRef = doc(db, "results", session.id);
         const completedAt = Timestamp.now();
-        const timeTakenSeconds = completedAt.seconds - (session.startedAt as Timestamp).seconds;
+        const startTime = session.startedAt instanceof Timestamp ? session.startedAt : Timestamp.fromDate(new Date(session.startedAt));
+        const timeTakenSeconds = completedAt.seconds - startTime.seconds;
 
         batch.update(resultDocRef, {
             answers: finalAnswers,

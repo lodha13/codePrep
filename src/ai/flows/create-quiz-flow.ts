@@ -1,9 +1,9 @@
-
 'use server';
 
 import { z } from 'zod';
 import { ai } from '@/ai/genkit';
-import { googleAI } from '@genkit-ai/google-genai';
+// Note: The import below confirms you are using the Genkit Google AI plugin
+import { googleAI } from '@genkit-ai/google-genai'; 
 
 // Define Zod schemas that match our Firestore types
 const TestCaseSchema = z.object({
@@ -12,27 +12,18 @@ const TestCaseSchema = z.object({
   isHidden: z.boolean().describe("Whether the test case is hidden from the user."),
 });
 
-const QuestionSchema = z.discriminatedUnion('type', [
-  z.object({
-    title: z.string().describe("The title of the question."),
-    description: z.string().describe("The question text, in HTML format."),
-    type: z.literal('mcq'),
-    difficulty: z.enum(['easy', 'medium', 'hard']),
-    mark: z.literal(1).describe("The points awarded for a correct answer. Always 1 for MCQs."),
-    options: z.array(z.string()).min(4).max(4).describe("An array of exactly 4 potential answers."),
-    correctOptionIndex: z.number().min(0).max(3).describe("The 0-based index of the correct option."),
-  }),
-  z.object({
-    title: z.string().describe("The title of the coding challenge."),
-    description: z.string().describe("A detailed description of the coding challenge, in HTML format."),
-    type: z.literal('coding'),
-    difficulty: z.enum(['easy', 'medium', 'hard']),
-    mark: z.literal(10).describe("The points awarded for a correct answer. Always 10 for coding questions."),
-    language: z.literal('java').describe("The programming language for the challenge, always 'java'."),
-    starterCode: z.string().describe("The boilerplate code to provide to the user."),
-    testCases: z.array(TestCaseSchema).min(3).describe("An array of at least 3 test cases."),
-  }),
-]);
+const QuestionSchema = z.object({
+  title: z.string().describe("The title of the question."),
+  description: z.string().describe("The question text, in HTML format."),
+  type: z.enum(['mcq', 'coding']).describe("The type of question."),
+  difficulty: z.enum(['easy', 'medium', 'hard']),
+  mark: z.number().describe("The points awarded for a correct answer."),
+  options: z.array(z.string()).optional().describe("Array of 4 options for MCQ questions."),
+  correctOptionIndex: z.number().optional().describe("The 0-based index of the correct option for MCQ."),
+  language: z.enum(['javascript', 'python', 'java', 'cpp']).optional().describe("Programming language for coding questions."),
+  starterCode: z.string().optional().describe("Boilerplate code for coding questions."),
+  testCases: z.array(TestCaseSchema).optional().describe("Test cases for coding questions."),
+});
 
 const QuizDataSchema = z.object({
   title: z.string().describe("A compelling and descriptive title for the quiz."),
@@ -43,7 +34,10 @@ const QuizDataSchema = z.object({
 });
 
 const QuizGenerationInputSchema = z.object({
-  topic: z.string(),
+  category: z.string().describe("Main skill category (e.g., Programming, DevOps, Database)"),
+  subCategory: z.string().optional().describe("Sub-category for more specific focus"),
+  language: z.enum(['javascript', 'python', 'java', 'cpp']).optional().describe("Programming language for coding questions"),
+  customPrompt: z.string().optional().describe("Additional context or specific requirements"),
   complexity: z.enum(['easy', 'medium', 'hard']),
   numberOfQuestions: z.number().int(),
 });
@@ -57,34 +51,6 @@ const QuizGenerationOutputSchema = z.object({
 export type QuizGenerationOutput = z.infer<typeof QuizGenerationOutputSchema>;
 
 
-const prompt = ai.definePrompt({
-  name: 'quizGenerationPrompt',
-  input: { schema: QuizGenerationInputSchema },
-  output: { schema: QuizGenerationOutputSchema },
-  prompt: `You are an expert educator and technical assessment creator specializing in Java.
-    Your task is to generate a high-quality quiz based on the provided topic, complexity, and number of questions.
-
-    Topic: {{{topic}}}
-    Complexity: {{{complexity}}}
-    Number of Questions: {{{numberOfQuestions}}}
-
-    Instructions:
-    1.  Create a quiz with a mix of Multiple Choice Questions (MCQ) and Coding questions. For a quiz of 10 or more questions, include at least 2 coding questions.
-    2.  All questions must be practical and scenario-based. Use code snippets to test theoretical concepts. AVOID purely theoretical questions.
-    3.  All code must be in Java.
-    4.  MCQ questions must have exactly 4 options.
-    5.  Coding questions must have at least 10 test cases, including edge cases. At least one test case must be hidden.
-    6.  All descriptions for questions must be in well-formatted HTML. Use <br/> for line breaks and <code><pre>...</pre></code> for code blocks.
-    7.  Assign 1 mark for Multiple Choice Questions (MCQ) and 10 marks for Coding questions. This is a strict rule.
-    8.  The final output MUST be a single JSON object that strictly adheres to the provided output schema. Do not include any text or formatting outside of the JSON object.
-    `,
-    config: {
-        model: googleAI.model('gemini-1.5-pro-preview'),
-        temperature: 0.8, // Increase creativity for more varied questions
-    }
-});
-
-
 const quizGenerationFlow = ai.defineFlow(
   {
     name: 'quizGenerationFlow',
@@ -92,16 +58,102 @@ const quizGenerationFlow = ai.defineFlow(
     outputSchema: QuizGenerationOutputSchema,
   },
   async (input) => {
-    const { output } = await prompt(input);
-    if (!output) {
+    const promptText = `You are an expert educator and technical assessment creator.
+Your task is to generate a high-quality quiz based on the provided parameters.
+
+Category: ${input.category}
+${input.subCategory ? `Sub-Category: ${input.subCategory}` : ''}
+${input.language ? `Programming Language: ${input.language}` : ''}
+${input.customPrompt ? `Custom Requirements: ${input.customPrompt}` : ''}
+Complexity: ${input.complexity}
+Number of Questions: ${input.numberOfQuestions}
+
+Instructions:
+1. Create a quiz with a mix of Multiple Choice Questions (MCQ) and Coding questions. For a quiz of 10 or more questions, include at least 2 coding questions.
+2. All questions must be practical and scenario-based. Use code snippets to test theoretical concepts. AVOID purely theoretical questions.
+3. If a programming language is specified, use that language for all coding questions. If not specified, choose the most appropriate language for the category.
+4. MCQ questions must have exactly 4 options.
+5. Coding questions must have at least 3 test cases, including edge cases. At least one test case should be hidden.
+6. All descriptions for questions must be in well-formatted HTML. Use <br/> for line breaks and <code><pre>...</pre></code> for code blocks.
+7. Assign 1 mark for Multiple Choice Questions (MCQ) and 10 marks for Coding questions. This is a strict rule.
+8. Consider the custom requirements/prompt if provided to tailor the questions accordingly.
+9. The quiz category should match the provided category, and if a sub-category is provided, focus on that specific area.
+10. The final output MUST be a single JSON object that strictly adheres to the following schema:
+
+{
+  "quiz": {
+    "title": "string",
+    "description": "string",
+    "durationMinutes": number,
+    "category": "string",
+    "difficulty": "easy" | "medium" | "hard"
+  },
+  "questions": [
+    {
+      "title": "string",
+      "description": "string (HTML format)",
+      "type": "mcq" | "coding",
+      "difficulty": "easy" | "medium" | "hard",
+      "mark": number,
+      // For MCQ questions:
+      "options": ["string", "string", "string", "string"],
+      "correctOptionIndex": number,
+      // For Coding questions:
+      "language": "javascript" | "python" | "java" | "cpp",
+      "starterCode": "string",
+      "testCases": [
+        {
+          "input": "string",
+          "expectedOutput": "string",
+          "isHidden": boolean
+        }
+      ]
+    }
+  ]
+}
+
+Do not include any text or formatting outside of the JSON object.`;
+
+    const result = await ai.generate({
+      // 🐛 FIX: Changed from 'gemini-1.5-flash-latest' to the core Genkit model ID
+      model: 'googleai/gemini-2.0-flash',
+      prompt: promptText,
+      config: { temperature: 0.8 }
+    });
+    
+    if (!result.text) {
       throw new Error('AI failed to generate quiz. The response was empty.');
     }
-    // Post-generation validation to ensure marks are correct
-    output.questions.forEach(q => {
-        if (q.type === 'mcq') q.mark = 1;
-        if (q.type === 'coding') q.mark = 10;
-    })
-    return output;
+    
+    // Parse JSON response
+    let parsedOutput;
+    try {
+      // Clean the response text to extract JSON
+      let cleanText = result.text.trim();
+      
+      // Remove markdown code blocks if present
+      if (cleanText.startsWith('```json')) {
+        cleanText = cleanText.replace(/^```json\s*/, '').replace(/\s*```$/, '');
+      } else if (cleanText.startsWith('```')) {
+        cleanText = cleanText.replace(/^```\s*/, '').replace(/\s*```$/, '');
+      }
+      
+      // Find JSON object boundaries
+      const jsonStart = cleanText.indexOf('{');
+      const jsonEnd = cleanText.lastIndexOf('}');
+      
+      if (jsonStart !== -1 && jsonEnd !== -1 && jsonEnd > jsonStart) {
+        cleanText = cleanText.substring(jsonStart, jsonEnd + 1);
+      }
+      
+      parsedOutput = JSON.parse(cleanText);
+    } catch (error) {
+      console.error('Failed to parse AI response:', result.text);
+      throw new Error('AI response is not valid JSON. Please try again.');
+    }
+    
+    // Return raw parsed output for admin validation
+    return parsedOutput;
   }
 );
 

@@ -8,8 +8,15 @@ import { writeBatch, collection, doc, serverTimestamp, Timestamp } from 'firebas
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 
+const UploadQuizSchema = z.object({
+  jsonContent: z.string().min(1, { message: "JSON content is required." }),
+});
+
 const GenerateQuizSchema = z.object({
-  topic: z.string().min(3, { message: "Topic must be at least 3 characters." }),
+  category: z.string().min(3, { message: "Category must be at least 3 characters." }),
+  subCategory: z.string().optional(),
+  language: z.enum(['javascript', 'python', 'java', 'cpp']).optional(),
+  customPrompt: z.string().optional(),
   complexity: z.enum(['easy', 'medium', 'hard']),
   numberOfQuestions: z.coerce.number().int().min(1).max(30),
 });
@@ -17,7 +24,10 @@ const GenerateQuizSchema = z.object({
 export async function generateQuizAction(prevState: any, formData: FormData) {
   try {
     const validatedFields = GenerateQuizSchema.safeParse({
-      topic: formData.get('topic'),
+      category: formData.get('category'),
+      subCategory: formData.get('subCategory') || undefined,
+      language: formData.get('language') || undefined,
+      customPrompt: formData.get('customPrompt') || undefined,
       complexity: formData.get('complexity'),
       numberOfQuestions: formData.get('numberOfQuestions'),
     });
@@ -26,10 +36,10 @@ export async function generateQuizAction(prevState: any, formData: FormData) {
       return { success: false, message: validatedFields.error.errors.map(e => e.message).join(', ') };
     }
 
-    const { topic, complexity, numberOfQuestions } = validatedFields.data;
+    const { category, subCategory, language, customPrompt, complexity, numberOfQuestions } = validatedFields.data;
 
     // Call the Genkit flow to generate the quiz content
-    const aiResult = await generateQuiz({ topic, complexity, numberOfQuestions });
+    const aiResult = await generateQuiz({ category, subCategory, language, customPrompt, complexity, numberOfQuestions });
     
     if (!aiResult || !aiResult.quiz || !aiResult.questions) {
       return { success: false, message: "AI failed to generate quiz content. Please try again." };
@@ -37,46 +47,41 @@ export async function generateQuizAction(prevState: any, formData: FormData) {
     
     const { quiz: quizData, questions: questionsData } = aiResult;
 
-    // --- Persist to Firestore ---
-    const batch = writeBatch(db);
-
-    // 1. Create and batch-write all the questions
-    const questionsCollection = collection(db, 'questions');
+    // Generate IDs and calculate total marks
     const questionIds: string[] = [];
     let totalMarks = 0;
 
-    questionsData.forEach((q) => {
-        const questionRef = doc(questionsCollection); // Auto-generate ID
-        questionIds.push(questionRef.id);
-        const questionPayload: Omit<Question, 'id' | 'createdAt'> & { createdAt: any } = {
+    const questionsWithIds = questionsData.map((q) => {
+        const questionId = `q_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        questionIds.push(questionId);
+        totalMarks += q.mark;
+        return {
+            id: questionId,
             ...q,
-            // @ts-ignore
-            createdAt: serverTimestamp(),
+            createdAt: new Date().toISOString(),
         };
-        totalMarks += questionPayload.mark;
-        batch.set(questionRef, questionPayload);
     });
 
-    // 2. Create the quiz document with the generated question IDs
-    const quizCollection = collection(db, 'quizzes');
-    const quizRef = doc(quizCollection);
-    
-    batch.set(quizRef, {
-        ...quizData,
-        questionIds: questionIds,
-        isPublic: true, // Default to public
-        type: 'assessment',
-        totalMarks: totalMarks,
-        createdAt: serverTimestamp(),
-        // Mock createdBy until proper user association is implemented
-        createdBy: 'ai-generator', 
-    });
-    
-    // Commit all writes to the database
-    await batch.commit();
+    // Create complete quiz object
+    const completeQuiz = {
+        quiz: {
+            id: `quiz_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+            ...quizData,
+            questionIds: questionIds,
+            isPublic: true,
+            type: 'assessment' as const,
+            totalMarks: totalMarks,
+            createdAt: new Date().toISOString(),
+            createdBy: 'ai-generator',
+        },
+        questions: questionsWithIds
+    };
 
-    revalidatePath('/admin/quizzes');
-    return { success: true, message: `Successfully generated and saved "${quizData.title}".` };
+    return { 
+        success: true, 
+        message: `Quiz "${quizData.title}" generated successfully. Download the JSON file to review before uploading.`,
+        downloadData: completeQuiz
+    };
 
   } catch (error: any) {
     console.error("Quiz generation failed:", error);
@@ -606,4 +611,76 @@ class Solution {
         console.error("Quiz seeding failed:", error);
         return { success: false, message: error.message || "An unexpected error occurred during quiz seeding." };
     }
+}
+
+export async function uploadQuizJsonAction(prevState: any, formData: FormData) {
+  try {
+    const validatedFields = UploadQuizSchema.safeParse({
+      jsonContent: formData.get('jsonContent'),
+    });
+
+    if (!validatedFields.success) {
+      return { success: false, message: validatedFields.error.errors.map(e => e.message).join(', ') };
+    }
+
+    const { jsonContent } = validatedFields.data;
+
+    // Parse JSON
+    let parsedData;
+    try {
+      parsedData = JSON.parse(jsonContent);
+    } catch (error) {
+      return { success: false, message: "Invalid JSON format. Please check your JSON syntax." };
+    }
+
+    // Validate structure
+    if (!parsedData.quiz || !parsedData.questions || !Array.isArray(parsedData.questions)) {
+      return { success: false, message: "Invalid JSON structure. Expected format: { quiz: {...}, questions: [...] }" };
+    }
+
+    const { quiz: quizData, questions: questionsData } = parsedData;
+
+    // Validate required fields
+    if (!quizData.title || !quizData.category || !questionsData.length) {
+      return { success: false, message: "Missing required fields: quiz title, category, or questions." };
+    }
+
+    const batch = writeBatch(db);
+
+    // Add questions to batch
+    const questionsCollection = collection(db, 'questions');
+    questionsData.forEach((questionData: any) => {
+      const questionId = questionData.id || doc(questionsCollection).id;
+      const questionRef = doc(questionsCollection, questionId);
+      
+      const questionPayload = {
+        ...questionData,
+        createdAt: serverTimestamp(),
+      };
+      
+      batch.set(questionRef, questionPayload);
+    });
+
+    // Add quiz to batch
+    const quizCollection = collection(db, 'quizzes');
+    const quizId = quizData.id || doc(quizCollection).id;
+    const quizRef = doc(quizCollection, quizId);
+    
+    const quizPayload = {
+      ...quizData,
+      createdAt: serverTimestamp(),
+    };
+    
+    batch.set(quizRef, quizPayload);
+
+    // Commit all writes
+    await batch.commit();
+
+    revalidatePath('/admin/quizzes');
+    return { success: true, message: `Successfully uploaded quiz "${quizData.title}" with ${questionsData.length} questions.` };
+
+  } catch (error: any) {
+    console.error("Quiz upload failed:", error);
+    return { success: false, message: error.message || "An unexpected error occurred during upload." };
+  }
 }
