@@ -50,7 +50,6 @@ export async function generateQuizAction(prevState: any, formData: FormData) {
         questionIds.push(questionRef.id);
         const questionPayload: Omit<Question, 'id' | 'createdAt'> & { createdAt: any } = {
             ...q,
-            mark: q.difficulty === 'easy' ? 5 : q.difficulty === 'medium' ? 10 : 15,
             // @ts-ignore
             createdAt: serverTimestamp(),
         };
@@ -88,8 +87,6 @@ export async function generateQuizAction(prevState: any, formData: FormData) {
 export async function seedQuizAction() {
     try {
         const batch = writeBatch(db);
-        const questionMark = 10;
-        let totalMarks = 0;
 
         // --- Questions Data ---
         const questions: (Omit<MCQQuestion, 'id'> | Omit<CodingQuestion, 'id'>)[] = [
@@ -99,7 +96,7 @@ export async function seedQuizAction() {
                 type: 'mcq',
                 difficulty: 'medium',
                 createdAt: new Date(),
-                mark: questionMark,
+                mark: 10,
                 options: [
                     'The task is queued and will run after currently running tasks complete.',
                     'A `RejectedExecutionException` is thrown.',
@@ -114,7 +111,7 @@ export async function seedQuizAction() {
                 type: 'mcq',
                 difficulty: 'medium',
                 createdAt: new Date(),
-                mark: questionMark,
+                mark: 10,
                 options: [
                     'Atomicity of compound actions (like incrementing).',
                     'That reads and writes are directly from/to main memory (visibility).',
@@ -129,7 +126,7 @@ export async function seedQuizAction() {
                 type: 'mcq',
                 difficulty: 'medium',
                 createdAt: new Date(),
-                mark: questionMark,
+                mark: 10,
                 options: [
                     'The ability to be re-entered by the same thread.',
                     'The ability to be fair (first-come, first-served).',
@@ -144,7 +141,7 @@ export async function seedQuizAction() {
                 type: 'mcq',
                 difficulty: 'hard',
                 createdAt: new Date(),
-                mark: questionMark,
+                mark: 15,
                 options: [
                     'Hello World from Main',
                     'from MainHello World',
@@ -159,7 +156,7 @@ export async function seedQuizAction() {
                 type: 'mcq',
                 difficulty: 'easy',
                 createdAt: new Date(),
-                mark: questionMark,
+                mark: 5,
                 options: [
                     'It starts the execution of thread `t`.',
                     'It interrupts the execution of thread `t`.',
@@ -174,7 +171,7 @@ export async function seedQuizAction() {
                 type: 'mcq',
                 difficulty: 'medium',
                 createdAt: new Date(),
-                mark: questionMark,
+                mark: 10,
                 options: [
                     '`map.put("key", 1);`',
                     '`if (!map.containsKey("key")) { map.put("key", 1); }`',
@@ -189,7 +186,7 @@ export async function seedQuizAction() {
                 type: 'mcq',
                 difficulty: 'hard',
                 createdAt: new Date(),
-                mark: questionMark,
+                mark: 15,
                 options: [
                     'ABC',
                     'BAC',
@@ -204,7 +201,7 @@ export async function seedQuizAction() {
                 type: 'mcq',
                 difficulty: 'easy',
                 createdAt: new Date(),
-                mark: questionMark,
+                mark: 5,
                 options: [
                     '`Runnable` can throw checked exceptions, `Callable` cannot.',
                     '`Callable` can return a value, `Runnable` cannot.',
@@ -219,7 +216,7 @@ export async function seedQuizAction() {
                 type: 'mcq',
                 difficulty: 'medium',
                 createdAt: new Date(),
-                mark: questionMark,
+                mark: 10,
                 options: [
                     'A value less than 2000.',
                     '2000',
@@ -234,7 +231,7 @@ export async function seedQuizAction() {
                 type: 'mcq',
                 difficulty: 'medium',
                 createdAt: new Date(),
-                mark: questionMark,
+                mark: 10,
                 options: [
                     'Race Condition',
                     'Livelock',
@@ -249,7 +246,7 @@ export async function seedQuizAction() {
                 type: 'mcq',
                 difficulty: 'medium',
                 createdAt: new Date(),
-                mark: questionMark,
+                mark: 10,
                 options: [
                     'It returns `null` immediately if the task is not complete.',
                     'It throws an `IllegalStateException` if the task is not complete.',
@@ -264,7 +261,7 @@ export async function seedQuizAction() {
                 type: 'mcq',
                 difficulty: 'easy',
                 createdAt: new Date(),
-                mark: questionMark,
+                mark: 5,
                 options: ['1', '2', '3', 'Unlimited'],
                 correctOptionIndex: 2,
             },
@@ -274,7 +271,7 @@ export async function seedQuizAction() {
                 type: 'mcq',
                 difficulty: 'hard',
                 createdAt: new Date(),
-                mark: questionMark,
+                mark: 15,
                 options: [
                     'It will create a fixed number of threads (e.g., 10) and queue the rest of the tasks.',
                     'It will create up to 100 threads (or as many as the system can handle) to execute the tasks concurrently.',
@@ -289,7 +286,7 @@ export async function seedQuizAction() {
                 type: 'mcq',
                 difficulty: 'medium',
                 createdAt: new Date(),
-                mark: questionMark,
+                mark: 10,
                 options: [
                     'It is shared among all threads.',
                     'It is accessible only by the thread that created it.',
@@ -304,7 +301,7 @@ export async function seedQuizAction() {
                 type: 'mcq',
                 difficulty: 'medium',
                 createdAt: new Date(),
-                mark: questionMark,
+                mark: 10,
                 options: [
                     'The application waits for the daemon threads to complete.',
                     'The application throws an `IllegalThreadStateException`.',
@@ -319,7 +316,7 @@ export async function seedQuizAction() {
                 type: 'mcq',
                 difficulty: 'medium',
                 createdAt: new Date(),
-                mark: questionMark,
+                mark: 10,
                 options: [
                     'The thread must be a daemon thread.',
                     'The thread must own the intrinsic lock of the object.',
@@ -334,7 +331,7 @@ export async function seedQuizAction() {
                 type: 'mcq',
                 difficulty: 'medium',
                 createdAt: new Date(),
-                mark: questionMark,
+                mark: 10,
                 options: [
                     'A value less than 2000.',
                     '2000',
@@ -349,7 +346,7 @@ export async function seedQuizAction() {
                 type: 'mcq',
                 difficulty: 'hard',
                 createdAt: new Date(),
-                mark: questionMark,
+                mark: 15,
                 options: [
                     '`CountDownLatch` can be reset and reused, `CyclicBarrier` cannot.',
                     '`CyclicBarrier` can be reset and reused, `CountDownLatch` cannot.',
@@ -364,7 +361,7 @@ export async function seedQuizAction() {
                 type: 'mcq',
                 difficulty: 'hard',
                 createdAt: new Date(),
-                mark: questionMark,
+                mark: 15,
                 options: [
                     'It runs the second future after the first one completes.',
                     'It runs when either of the two futures completes.',
@@ -379,7 +376,7 @@ export async function seedQuizAction() {
                 type: 'mcq',
                 difficulty: 'hard',
                 createdAt: new Date(),
-                mark: questionMark,
+                mark: 15,
                 options: [
                     'Because optimistic reads are not thread-safe.',
                     'Because the lock might have been exclusively locked by a writer between the time the optimistic read stamp was obtained and the read was finished.',
@@ -395,7 +392,7 @@ export async function seedQuizAction() {
                 difficulty: 'hard',
                 language: 'java',
                 createdAt: new Date(),
-                mark: questionMark,
+                mark: 15,
                 starterCode: `import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -433,7 +430,7 @@ class Solution {
                 type: 'mcq',
                 difficulty: 'hard',
                 createdAt: new Date(),
-                mark: questionMark,
+                mark: 15,
                 options: [
                     'The sum of the elements in the array.',
                     'The code will not compile without a `RecursiveAction`.',
@@ -448,7 +445,7 @@ class Solution {
                 type: 'mcq',
                 difficulty: 'medium',
                 createdAt: new Date(),
-                mark: questionMark,
+                mark: 10,
                 options: [
                     'The sleeping thread immediately stops execution.',
                     'The `sleep()` method throws an `InterruptedException`.',
@@ -463,7 +460,7 @@ class Solution {
                 type: 'mcq',
                 difficulty: 'medium',
                 createdAt: new Date(),
-                mark: questionMark,
+                mark: 10,
                 options: [
                     'When the number of write operations is much higher than read operations.',
                     'When the number of read operations is much higher than write operations.',
@@ -478,7 +475,7 @@ class Solution {
                 type: 'mcq',
                 difficulty: 'medium',
                 createdAt: new Date(),
-                mark: questionMark,
+                mark: 10,
                 options: [
                     'It returns `false` immediately.',
                     'It throws an `IllegalStateException`.',
@@ -493,7 +490,7 @@ class Solution {
                 type: 'mcq',
                 difficulty: 'hard',
                 createdAt: new Date(),
-                mark: questionMark,
+                mark: 15,
                 options: [
                     'ACB',
                     'CAB',
@@ -509,7 +506,7 @@ class Solution {
                 difficulty: 'hard',
                 language: 'java',
                 createdAt: new Date(),
-                mark: questionMark,
+                mark: 15,
                 starterCode: `import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ArrayBlockingQueue;
@@ -547,7 +544,7 @@ class Solution {
                 type: 'mcq',
                 difficulty: 'hard',
                 createdAt: new Date(),
-                mark: questionMark,
+                mark: 15,
                 options: [
                     'Success',
                     'Error!Fallback',
@@ -562,7 +559,7 @@ class Solution {
                 type: 'mcq',
                 difficulty: 'hard',
                 createdAt: new Date(),
-                mark: questionMark,
+                mark: 15,
                 options: [
                     'The new task is run in the calling thread.',
                     'The oldest task in the queue is discarded.',
@@ -577,7 +574,7 @@ class Solution {
                 type: 'mcq',
                 difficulty: 'medium',
                 createdAt: new Date(),
-                mark: questionMark,
+                mark: 10,
                 options: [
                     '`volatile int` is slower.',
                     '`volatile` does not guarantee atomicity for the increment operation (read-modify-write).',

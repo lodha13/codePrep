@@ -56,47 +56,51 @@ export default function QuizRunner({ quiz, questions, session }: QuizRunnerProps
             const userAnswer = currentAnswer?.userAnswer;
             
             let questionScore = 0;
-            let status: QuestionResult['status'] = "incorrect";
-            const questionTotalMarks = q.mark || 10;
+            let status: QuestionResult['status'] = "unanswered";
+            const questionTotalMarks = q.mark;
             
             let questionResult: Partial<QuestionResult> = {
                 userAnswer: userAnswer || "",
                 total: questionTotalMarks,
             };
 
-            if (!userAnswer || userAnswer.trim() === '') {
+            if (userAnswer && userAnswer.trim() !== '') {
+                 if (q.type === 'mcq') {
+                    const mcq = q as MCQQuestion;
+                    const isCorrect = userAnswer === mcq.correctOptionIndex.toString();
+                    if (isCorrect) {
+                        questionScore = questionTotalMarks;
+                        status = 'correct';
+                    } else {
+                        questionScore = 0;
+                        status = 'incorrect';
+                    }
+                } else if (q.type === 'coding') {
+                    const codingQ = q as CodingQuestion;
+                    const executionResult = await executeCode(userAnswer, codingQ.language, codingQ.testCases);
+                    
+                    const passedTests = executionResult.test_case_results?.filter(r => r.passed).length || 0;
+                    const totalTests = codingQ.testCases.length;
+                    
+                    if (totalTests > 0) {
+                        questionScore = Math.round((passedTests / totalTests) * questionTotalMarks);
+                    }
+                    
+                    if (executionResult.test_case_results) {
+                        questionResult.testCaseResults = executionResult.test_case_results;
+                    }
+                    
+                    if (passedTests === totalTests && totalTests > 0) {
+                        status = 'correct';
+                    } else if (passedTests > 0) {
+                        status = 'partial';
+                    } else {
+                        status = 'incorrect';
+                    }
+                }
+            } else {
                 status = "unanswered";
                 questionScore = 0;
-            } else if (q.type === 'mcq') {
-                const mcq = q as MCQQuestion;
-                const isCorrect = userAnswer === mcq.correctOptionIndex.toString();
-                if (isCorrect) {
-                    questionScore = questionTotalMarks;
-                    status = 'correct';
-                } else {
-                    questionScore = 0;
-                    status = 'incorrect';
-                }
-            } else if (q.type === 'coding') {
-                const codingQ = q as CodingQuestion;
-                const executionResult = await executeCode(userAnswer, codingQ.language, codingQ.testCases);
-                
-                const passedTests = executionResult.test_case_results?.filter(r => r.passed).length || 0;
-                const totalTests = codingQ.testCases.length;
-                
-                questionScore = totalTests > 0 ? Math.round((passedTests / totalTests) * questionTotalMarks) : 0;
-                
-                if (executionResult.test_case_results) {
-                    questionResult.testCaseResults = executionResult.test_case_results;
-                }
-                
-                if (passedTests === totalTests && totalTests > 0) {
-                    status = 'correct';
-                } else if (passedTests > 0) {
-                    status = 'partial';
-                } else {
-                    status = 'incorrect';
-                }
             }
             
             totalQuizScore += questionScore;
@@ -106,9 +110,9 @@ export default function QuizRunner({ quiz, questions, session }: QuizRunnerProps
                 questionId: q.id,
                 score: questionScore,
                 status: status,
-                userAnswer: userAnswer || "",
                 total: questionTotalMarks,
-                testCaseResults: questionResult.testCaseResults,
+                ...(userAnswer && { userAnswer: userAnswer }),
+                ...(questionResult.testCaseResults && { testCaseResults: questionResult.testCaseResults }),
             };
         }
 
