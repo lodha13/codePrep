@@ -4,7 +4,7 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { db } from '@/lib/firebase';
-import { collection, query, where, getDocs } from 'firebase/firestore';
+import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
 import { QuizResult } from '@/types/schema';
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -25,22 +25,16 @@ export default function ProfilePage() {
             };
 
             setLoading(true);
-            // Correctly query the root 'results' collection for the user's completed tests.
+            // Query with ordering for better performance
             const resultsQuery = query(
                 collection(db, 'results'),
                 where('userId', '==', user.uid),
-                where('status', '==', 'completed')
+                where('status', '==', 'completed'),
+                orderBy('completedAt', 'desc')
             );
             
             const resultsSnap = await getDocs(resultsQuery);
             const userResults = resultsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as QuizResult));
-
-            // Sort results by completion date, most recent first
-            userResults.sort((a, b) => {
-                const dateA = (a.completedAt as Timestamp)?.toDate() || new Date(0);
-                const dateB = (b.completedAt as Timestamp)?.toDate() || new Date(0);
-                return dateB.getTime() - dateA.getTime();
-            });
 
             setResults(userResults);
             setLoading(false);

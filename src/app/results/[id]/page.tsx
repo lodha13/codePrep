@@ -174,7 +174,7 @@ export default function ResultPage() {
             <Card className="shadow-lg">
                 <CardHeader className="text-center">
                     <CardTitle className="text-6xl font-bold font-headline">{percentage}%</CardTitle>
-                    <CardDescription className="text-lg">You scored {result.score} out of {result.totalScore}</CardDescription>
+                    <CardDescription className="text-lg">You scored {Math.round(result.score * 10) / 10} out of {result.totalScore}</CardDescription>
                 </CardHeader>
                 <CardContent className="flex flex-col items-center gap-4">
                      <div className="flex items-center text-muted-foreground">
@@ -202,7 +202,10 @@ export default function ResultPage() {
                             <div className="flex justify-between items-start mb-4">
                                 <h3 className="text-lg font-semibold">Question {index + 1}: {question.title}</h3>
                                 <div className="font-bold text-lg text-right flex-shrink-0 ml-4">
-                                    {ans.score ?? 0} / {ans.total} pts
+                                    {(() => {
+                                        console.log('Raw score:', ans.score, 'Rounded:', Math.round((ans.score ?? 0) * 10) / 10);
+                                        return Math.round((ans.score ?? 0) * 10) / 10;
+                                    })()} / {ans.total} pts
                                 </div>
                             </div>
                             <div className="flex items-start gap-4">

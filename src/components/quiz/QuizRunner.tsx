@@ -107,7 +107,7 @@ export default function QuizRunner({ quiz, questions, session }: QuizRunnerProps
                     const totalTests = codingQ.testCases.length;
                     
                     if (totalTests > 0) {
-                        questionScore = Math.round((passedTests / totalTests) * questionTotalMarks);
+                        questionScore = (passedTests / totalTests) * questionTotalMarks;
                     }
                     
                     if (executionResult.test_case_results) {
