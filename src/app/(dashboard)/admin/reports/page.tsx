@@ -36,6 +36,7 @@ interface User {
     completedQuizIds?: string[];
     onBench?: boolean;
     createdAt?: any;
+    primarySkill?: string;
 }
 
 interface Quiz {
@@ -68,6 +69,13 @@ export default function ReportsPage() {
     const [loadingResults, setLoadingResults] = useState(false);
     const [userQuizStats, setUserQuizStats] = useState<any>(null);
     const [showOnBenchOnly, setShowOnBenchOnly] = useState(true);
+    const [nameFilter, setNameFilter] = useState<string>("");
+    const [skillFilter, setSkillFilter] = useState<string>("");
+    const [availableSkills, setAvailableSkills] = useState<string[]>([]);
+    const [rankingNameFilter, setRankingNameFilter] = useState<string>("");
+    const [rankingSkillFilter, setRankingSkillFilter] = useState<string>("");
+    const [sortBy, setSortBy] = useState<string>("percentage");
+    const [sortOrder, setSortOrder] = useState<string>("desc");
 
     useEffect(() => {
         fetchData();
@@ -75,10 +83,14 @@ export default function ReportsPage() {
 
     useEffect(() => {
         if (users.length && quizzes.length && results.length) {
+            // Get unique skills from users
+            const skills = [...new Set(users.filter(u => u.primarySkill).map(u => u.primarySkill))].sort();
+            setAvailableSkills(['Java', 'React', 'Angular', 'DB', 'QA', ...skills.filter(s => !['Java', 'React', 'Angular', 'DB', 'QA'].includes(s!))]);
+            
             generateIncompleteReport();
             generateRankings();
         }
-    }, [users, quizzes, results, selectedQuiz, showOnBenchOnly]);
+    }, [users, quizzes, results, selectedQuiz, showOnBenchOnly, nameFilter, skillFilter, rankingNameFilter, rankingSkillFilter, sortBy, sortOrder]);
 
     const fetchUserResults = async (userId: string) => {
         setLoadingResults(true);
@@ -155,6 +167,21 @@ export default function ReportsPage() {
             candidates = candidates.filter(user => user.onBench === true);
         }
         
+        // Filter by name
+        if (nameFilter) {
+            candidates = candidates.filter(user => 
+                user.displayName?.toLowerCase().includes(nameFilter.toLowerCase()) ||
+                user.email.toLowerCase().includes(nameFilter.toLowerCase())
+            );
+        }
+        
+        // Filter by skill
+        if (skillFilter) {
+            candidates = candidates.filter(user => 
+                user.primarySkill?.toLowerCase().includes(skillFilter.toLowerCase())
+            );
+        }
+        
         const incomplete = candidates.map(user => {
             // Get public quiz IDs
             const publicQuizIds = quizzes.filter(q => q.isPublic).map(q => q.id);
@@ -194,6 +221,7 @@ export default function ReportsPage() {
                 progressPercentage: allAvailableQuizIds.length > 0 ? Math.round((completedQuizzes.length / allAvailableQuizIds.length) * 100) : 0,
                 benchAge: benchAge,
                 createdDate: user.createdAt,
+                primarySkill: user.primarySkill || 'Not Set',
                 incompleteQuizzes: incompleteQuizzes.map(quizId => {
                     const quiz = quizzes.find(q => q.id === quizId);
                     return quiz ? quiz.title : "Unknown Quiz";
@@ -205,13 +233,21 @@ export default function ReportsPage() {
     };
 
     const generateRankings = () => {
-        let filteredResults = results;
+        // Filter users first (onBench = true)
+        let eligibleUsers = users.filter(user => 
+            user.role === "candidate" && 
+            user.onBench === true
+        );
+        
+        const eligibleUserIds = eligibleUsers.map(u => u.id);
+        
+        let filteredResults = results.filter(result => eligibleUserIds.includes(result.userId));
         
         if (selectedQuiz === "public") {
             const publicQuizIds = quizzes.filter(q => q.isPublic).map(q => q.id);
-            filteredResults = results.filter(result => publicQuizIds.includes(result.quizId));
+            filteredResults = filteredResults.filter(result => publicQuizIds.includes(result.quizId));
         } else if (selectedQuiz !== "all") {
-            filteredResults = results.filter(result => result.quizId === selectedQuiz);
+            filteredResults = filteredResults.filter(result => result.quizId === selectedQuiz);
         }
 
         // Group results by user and calculate total scores
@@ -224,9 +260,11 @@ export default function ReportsPage() {
             const key = result.userId;
             if (!userScores.has(key)) {
                 userScores.set(key, {
+                    user: user,
                     userId: result.userId,
                     userName: user.displayName || user.email,
                     userEmail: user.email,
+                    primarySkill: user.primarySkill || 'Not Set',
                     totalScore: 0,
                     maxScore: 0,
                     quizzesCompleted: 0
@@ -239,15 +277,56 @@ export default function ReportsPage() {
             userScore.quizzesCompleted += 1;
         });
 
-        // Convert to array and sort by percentage
-        const rankingsArray = Array.from(userScores.values())
+        // Convert to array and add percentage
+        let rankingsArray = Array.from(userScores.values())
             .map(user => ({
                 ...user,
                 percentage: user.maxScore > 0 ? Math.round((user.totalScore / user.maxScore) * 100) : 0
-            }))
-            .sort((a, b) => b.percentage - a.percentage);
+            }));
 
-        setRankings(rankingsArray);
+        // Apply name filter
+        if (rankingNameFilter) {
+            rankingsArray = rankingsArray.filter(user => 
+                user.userName.toLowerCase().includes(rankingNameFilter.toLowerCase()) ||
+                user.userEmail.toLowerCase().includes(rankingNameFilter.toLowerCase())
+            );
+        }
+        
+        // Apply skill filter
+        if (rankingSkillFilter) {
+            rankingsArray = rankingsArray.filter(user => 
+                user.primarySkill.toLowerCase().includes(rankingSkillFilter.toLowerCase())
+            );
+        }
+
+        // Sort the array
+        rankingsArray.sort((a, b) => {
+            let aVal, bVal;
+            switch (sortBy) {
+                case 'name':
+                    aVal = a.userName.toLowerCase();
+                    bVal = b.userName.toLowerCase();
+                    break;
+                case 'skill':
+                    aVal = a.primarySkill.toLowerCase();
+                    bVal = b.primarySkill.toLowerCase();
+                    break;
+                case 'percentage':
+                default:
+                    aVal = a.percentage;
+                    bVal = b.percentage;
+                    break;
+            }
+            
+            if (sortOrder === 'asc') {
+                return aVal > bVal ? 1 : -1;
+            } else {
+                return aVal < bVal ? 1 : -1;
+            }
+        });
+
+        // Limit to top 50
+        setRankings(rankingsArray.slice(0, 50));
     };
 
     if (loading) {
@@ -285,31 +364,64 @@ export default function ReportsPage() {
                     </div>
                 </CardHeader>
                 <CardContent>
-                    {incompleteUsers.length === 0 ? (
-                        <p className="text-muted-foreground text-center py-8">
-                            {showOnBenchOnly ? "All bench candidates have completed their assigned quizzes!" : "All candidates have completed their assigned quizzes!"}
-                        </p>
-                    ) : (
-                        <Table>
-                            <TableHeader>
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>
+                                    <div className="space-y-2">
+                                        <div>Candidate</div>
+                                        <Input
+                                            placeholder="Filter by name..."
+                                            value={nameFilter}
+                                            onChange={(e) => setNameFilter(e.target.value)}
+                                            className="h-8 text-xs"
+                                        />
+                                    </div>
+                                </TableHead>
+                                <TableHead>
+                                    <div className="space-y-2">
+                                        <div>Primary Skill</div>
+                                        <Input
+                                            placeholder="Filter by skill..."
+                                            value={skillFilter}
+                                            onChange={(e) => setSkillFilter(e.target.value)}
+                                            className="h-8 text-xs"
+                                        />
+                                    </div>
+                                </TableHead>
+                                <TableHead>Bench Age</TableHead>
+                                <TableHead>Progress</TableHead>
+                                <TableHead>Avg Score</TableHead>
+                                <TableHead>Completed</TableHead>
+                                <TableHead>Pending</TableHead>
+                                <TableHead>Actions</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {incompleteUsers.length === 0 ? (
                                 <TableRow>
-                                    <TableHead>Candidate</TableHead>
-                                    <TableHead>Bench Age</TableHead>
-                                    <TableHead>Progress</TableHead>
-                                    <TableHead>Avg Score</TableHead>
-                                    <TableHead>Completed</TableHead>
-                                    <TableHead>Pending</TableHead>
-                                    <TableHead>Actions</TableHead>
+                                    <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                                        {nameFilter || skillFilter 
+                                            ? "No candidates match the current filters. Try adjusting your search criteria."
+                                            : showOnBenchOnly 
+                                                ? "All bench candidates have completed their assigned quizzes!"
+                                                : "All candidates have completed their assigned quizzes!"
+                                        }
+                                    </TableCell>
                                 </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {incompleteUsers.map(userData => (
+                            ) : (
+                                incompleteUsers.map(userData => (
                                     <TableRow key={userData.userId}>
                                         <TableCell>
                                             <div>
                                                 <p className="font-medium">{userData.userName}</p>
                                                 <p className="text-sm text-muted-foreground">{userData.userEmail}</p>
                                             </div>
+                                        </TableCell>
+                                        <TableCell>
+                                            <Badge variant="secondary">
+                                                {userData.primarySkill}
+                                            </Badge>
                                         </TableCell>
                                         <TableCell>
                                             <Badge variant="outline">
@@ -465,10 +577,10 @@ export default function ReportsPage() {
                                             </Dialog>
                                         </TableCell>
                                     </TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
-                    )}
+                                ))
+                            )}
+                        </TableBody>
+                    </Table>
                     </CardContent>
                 </Card>
                 </TabsContent>
@@ -499,31 +611,265 @@ export default function ReportsPage() {
                     </div>
                 </CardHeader>
                 <CardContent>
-                    {rankings.length === 0 ? (
-                        <p className="text-muted-foreground">No results found for the selected criteria.</p>
-                    ) : (
-                        <div className="space-y-2">
-                            {rankings.map((user, index) => (
-                                <div key={user.userId} className="flex items-center justify-between p-3 border rounded-lg">
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-bold">
-                                            {index + 1}
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Rank</TableHead>
+                                <TableHead>
+                                    <div className="space-y-2">
+                                        <div className="flex items-center gap-1">
+                                            <span>Candidate</span>
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={() => {
+                                                    if (sortBy === 'name') {
+                                                        setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+                                                    } else {
+                                                        setSortBy('name');
+                                                        setSortOrder('asc');
+                                                    }
+                                                }}
+                                                className="h-6 w-6 p-0"
+                                            >
+                                                {sortBy === 'name' ? (sortOrder === 'asc' ? '↑' : '↓') : '↕'}
+                                            </Button>
                                         </div>
-                                        <div>
-                                            <p className="font-semibold">{user.userName}</p>
-                                            <p className="text-sm text-muted-foreground">{user.userEmail}</p>
+                                        <Input
+                                            placeholder="Filter by name..."
+                                            value={rankingNameFilter}
+                                            onChange={(e) => setRankingNameFilter(e.target.value)}
+                                            className="h-8 text-xs"
+                                        />
+                                    </div>
+                                </TableHead>
+                                <TableHead>
+                                    <div className="space-y-2">
+                                        <div className="flex items-center gap-1">
+                                            <span>Primary Skill</span>
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={() => {
+                                                    if (sortBy === 'skill') {
+                                                        setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+                                                    } else {
+                                                        setSortBy('skill');
+                                                        setSortOrder('asc');
+                                                    }
+                                                }}
+                                                className="h-6 w-6 p-0"
+                                            >
+                                                {sortBy === 'skill' ? (sortOrder === 'asc' ? '↑' : '↓') : '↕'}
+                                            </Button>
                                         </div>
+                                        <Input
+                                            placeholder="Filter by skill..."
+                                            value={rankingSkillFilter}
+                                            onChange={(e) => setRankingSkillFilter(e.target.value)}
+                                            className="h-8 text-xs"
+                                        />
                                     </div>
-                                    <div className="text-right">
-                                        <p className="font-bold text-lg">{user.percentage}%</p>
-                                        <p className="text-sm text-muted-foreground">
-                                            {Math.round(user.totalScore * 10) / 10}/{user.maxScore} pts ({user.quizzesCompleted} quizzes)
-                                        </p>
+                                </TableHead>
+                                <TableHead>
+                                    <div className="flex items-center gap-1">
+                                        <span>Score</span>
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() => {
+                                                if (sortBy === 'percentage') {
+                                                    setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+                                                } else {
+                                                    setSortBy('percentage');
+                                                    setSortOrder('desc');
+                                                }
+                                            }}
+                                            className="h-6 w-6 p-0"
+                                        >
+                                            {sortBy === 'percentage' ? (sortOrder === 'asc' ? '↑' : '↓') : '↕'}
+                                        </Button>
                                     </div>
-                                </div>
-                            ))}
-                        </div>
-                    )}
+                                </TableHead>
+                                <TableHead>Quizzes</TableHead>
+                                <TableHead>Actions</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {rankings.length === 0 ? (
+                                <TableRow>
+                                    <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                                        {rankingNameFilter || rankingSkillFilter 
+                                            ? "No candidates match the current filters. Try adjusting your search criteria."
+                                            : "No results found for the selected criteria."
+                                        }
+                                    </TableCell>
+                                </TableRow>
+                            ) : (
+                                rankings.map((user, index) => (
+                                    <TableRow key={user.userId}>
+                                        <TableCell>
+                                            <div className="w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-bold">
+                                                {index + 1}
+                                            </div>
+                                        </TableCell>
+                                        <TableCell>
+                                            <div>
+                                                <p className="font-medium">{user.userName}</p>
+                                                <p className="text-sm text-muted-foreground">{user.userEmail}</p>
+                                            </div>
+                                        </TableCell>
+                                        <TableCell>
+                                            <Badge variant="secondary">
+                                                {user.primarySkill}
+                                            </Badge>
+                                        </TableCell>
+                                        <TableCell>
+                                            <div className="text-right">
+                                                <p className="font-bold text-lg">{user.percentage}%</p>
+                                                <p className="text-sm text-muted-foreground">
+                                                    {Math.round(user.totalScore * 10) / 10}/{user.maxScore} pts
+                                                </p>
+                                            </div>
+                                        </TableCell>
+                                        <TableCell>
+                                            <Badge variant="outline">
+                                                {user.quizzesCompleted} completed
+                                            </Badge>
+                                        </TableCell>
+                                        <TableCell>
+                                            {user.user && (
+                                                <Dialog>
+                                                    <DialogTrigger asChild>
+                                                        <Button
+                                                            variant="outline"
+                                                            size="sm"
+                                                            onClick={() => handleViewUser(user.user)}
+                                                        >
+                                                            <Eye className="h-4 w-4" />
+                                                        </Button>
+                                                    </DialogTrigger>
+                                                    <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+                                                        <DialogHeader>
+                                                            <DialogTitle>Candidate Details: {user.userName}</DialogTitle>
+                                                        </DialogHeader>
+                                                        {selectedUser?.id === user.userId && (
+                                                            <div className="space-y-6">
+                                                                {/* User Info */}
+                                                                <Card>
+                                                                    <CardHeader>
+                                                                        <CardTitle className="text-lg">User Information</CardTitle>
+                                                                    </CardHeader>
+                                                                    <CardContent>
+                                                                        <div className="grid grid-cols-2 gap-4">
+                                                                            <div>
+                                                                                <p className="text-sm font-medium">Name</p>
+                                                                                <p className="text-sm text-muted-foreground">{user.user.displayName || 'N/A'}</p>
+                                                                            </div>
+                                                                            <div>
+                                                                                <p className="text-sm font-medium">Email</p>
+                                                                                <p className="text-sm text-muted-foreground">{user.user.email}</p>
+                                                                            </div>
+                                                                            <div>
+                                                                                <p className="text-sm font-medium">Total Assigned Quizzes</p>
+                                                                                <p className="text-sm text-muted-foreground">{userQuizStats?.totalAssigned || 0}</p>
+                                                                            </div>
+                                                                            <div>
+                                                                                <p className="text-sm font-medium">Completed Quizzes</p>
+                                                                                <p className="text-sm text-muted-foreground">{userQuizStats?.totalCompleted || 0}</p>
+                                                                            </div>
+                                                                            <div>
+                                                                                <p className="text-sm font-medium">Pending Quizzes</p>
+                                                                                <p className="text-sm text-muted-foreground">{userQuizStats?.pendingCount || 0}</p>
+                                                                            </div>
+                                                                            <div>
+                                                                                <p className="text-sm font-medium">Progress</p>
+                                                                                <p className="text-sm text-muted-foreground">
+                                                                                    {userQuizStats?.totalAssigned > 0 
+                                                                                        ? Math.round((userQuizStats.totalCompleted / userQuizStats.totalAssigned) * 100)
+                                                                                        : 0}% Complete
+                                                                                </p>
+                                                                            </div>
+                                                                        </div>
+                                                                    </CardContent>
+                                                                </Card>
+
+                                                                {/* Pending Quizzes */}
+                                                                {userQuizStats?.pendingQuizzes?.length > 0 && (
+                                                                    <Card>
+                                                                        <CardHeader>
+                                                                            <CardTitle className="text-lg flex items-center gap-2">
+                                                                                <AlertTriangle className="h-5 w-5 text-orange-500" />
+                                                                                Pending Quizzes ({userQuizStats.pendingCount})
+                                                                            </CardTitle>
+                                                                        </CardHeader>
+                                                                        <CardContent>
+                                                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                                                                                {userQuizStats.pendingQuizzes.map((quiz: any) => (
+                                                                                    <div key={quiz.id} className="p-2 bg-orange-50 border border-orange-200 rounded text-sm">
+                                                                                        {quiz.title}
+                                                                                    </div>
+                                                                                ))}
+                                                                            </div>
+                                                                        </CardContent>
+                                                                    </Card>
+                                                                )}
+
+                                                                {/* Quiz Results */}
+                                                                <Card>
+                                                                    <CardHeader>
+                                                                        <CardTitle className="text-lg flex items-center gap-2">
+                                                                            <Trophy className="h-5 w-5" />
+                                                                            Completed Quiz Results
+                                                                        </CardTitle>
+                                                                    </CardHeader>
+                                                                    <CardContent>
+                                                                        {loadingResults ? (
+                                                                            <p className="text-center py-4">Loading results...</p>
+                                                                        ) : userResults.length === 0 ? (
+                                                                            <p className="text-center py-4 text-muted-foreground">No completed quizzes found.</p>
+                                                                        ) : (
+                                                                            <div className="space-y-3">
+                                                                                {userResults.map((result) => (
+                                                                                    <div key={result.id} className="flex items-center justify-between p-3 border rounded-lg">
+                                                                                        <div>
+                                                                                            <h4 className="font-semibold">{result.quizTitle || 'Quiz'}</h4>
+                                                                                            <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                                                                                                <div className="flex items-center gap-1">
+                                                                                                    <Trophy className="h-4 w-4" />
+                                                                                                    <span>Score: {Math.round((result.score || 0) * 10) / 10}/{result.totalScore}</span>
+                                                                                                </div>
+                                                                                                <div className="flex items-center gap-1">
+                                                                                                    <Calendar className="h-4 w-4" />
+                                                                                                    <span>Completed: {formatDate(result.completedAt)}</span>
+                                                                                                </div>
+                                                                                            </div>
+                                                                                        </div>
+                                                                                        <div className="text-right">
+                                                                                            <div className="text-lg font-bold">
+                                                                                                {result.totalScore > 0 ? Math.round((result.score / result.totalScore) * 100) : 0}%
+                                                                                            </div>
+                                                                                            <Button asChild variant="outline" size="sm">
+                                                                                                <Link href={`/results/${result.id}`}>View Details</Link>
+                                                                                            </Button>
+                                                                                        </div>
+                                                                                    </div>
+                                                                                ))}
+                                                                            </div>
+                                                                        )}
+                                                                    </CardContent>
+                                                                </Card>
+                                                            </div>
+                                                        )}
+                                                    </DialogContent>
+                                                </Dialog>
+                                            )}
+                                        </TableCell>
+                                    </TableRow>
+                                ))
+                            )}
+                        </TableBody>
+                    </Table>
                     </CardContent>
                 </Card>
                 </TabsContent>
