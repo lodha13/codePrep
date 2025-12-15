@@ -40,6 +40,7 @@ const QuizGenerationInputSchema = z.object({
   customPrompt: z.string().optional().describe("Additional context or specific requirements"),
   complexity: z.enum(['easy', 'medium', 'hard']),
   numberOfQuestions: z.number().int(),
+  questionType: z.enum(['mcq', 'coding', 'mixed']).describe("Type of questions to generate"),
 });
 export type QuizGenerationInput = z.infer<typeof QuizGenerationInputSchema>;
 
@@ -58,6 +59,16 @@ const quizGenerationFlow = ai.defineFlow(
     outputSchema: QuizGenerationOutputSchema,
   },
   async (input) => {
+    // Generate question type instructions based on selection
+    let questionTypeInstructions = '';
+    if (input.questionType === 'mcq') {
+      questionTypeInstructions = '1. Create a quiz with ONLY Multiple Choice Questions (MCQ). Do not include any coding questions.';
+    } else if (input.questionType === 'coding') {
+      questionTypeInstructions = '1. Create a quiz with ONLY Coding questions. Do not include any MCQ questions.';
+    } else { // mixed
+      questionTypeInstructions = '1. Create a quiz with a mix of Multiple Choice Questions (MCQ) and Coding questions. Ensure at least 20% of questions are coding questions and 80% are MCQ questions.';
+    }
+
     const promptText = `You are an expert educator and technical assessment creator.
 Your task is to generate a high-quality quiz based on the provided parameters.
 
@@ -67,13 +78,14 @@ ${input.language ? `Programming Language: ${input.language}` : ''}
 ${input.customPrompt ? `Custom Requirements: ${input.customPrompt}` : ''}
 Complexity: ${input.complexity}
 Number of Questions: ${input.numberOfQuestions}
+Question Type: ${input.questionType}
 
 Instructions:
-1. Create a quiz with a mix of Multiple Choice Questions (MCQ) and Coding questions. For a quiz of 10 or more questions, include at least 2 coding questions.
+${questionTypeInstructions}
 2. All questions must be practical and scenario-based. Use code snippets to test theoretical concepts. AVOID purely theoretical questions.
-3. If a programming language is specified, use that language for all coding questions. If not specified, choose the most appropriate language for the category.
-4. MCQ questions must have exactly 4 options.
-5. Coding questions must have at least 3 test cases, including edge cases. At least one test case should be hidden.
+3. CRITICAL: ${input.language ? `You MUST use ${input.language.toUpperCase()} programming language for ALL coding questions and code examples. Do not use any other programming language.` : 'Choose the most appropriate language for the category.'}
+4. If MCQ questions, It must have exactly 4 options.
+5. Coding questions must have at least 4 test cases, including edge cases. At least 2 test case should be hidden.
 6. All descriptions for questions must be in well-formatted HTML. Use <br/> for line breaks and <code><pre>...</pre></code> for code blocks.
 7. Assign 1 mark for Multiple Choice Questions (MCQ) and 10 marks for Coding questions. This is a strict rule.
 8. Consider the custom requirements/prompt if provided to tailor the questions accordingly.
@@ -99,7 +111,7 @@ Instructions:
       "options": ["string", "string", "string", "string"],
       "correctOptionIndex": number,
       // For Coding questions:
-      "language": "javascript" | "python" | "java" | "cpp",
+      "language": "${input.language || 'javascript'}" | "python" | "java" | "cpp",
       "starterCode": "string",
       "testCases": [
         {

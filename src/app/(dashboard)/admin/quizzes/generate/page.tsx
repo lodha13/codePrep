@@ -171,16 +171,15 @@ export default function GenerateQuizPage() {
                         </div>
                         <div className="grid grid-cols-2 gap-4">
                             <div className="grid gap-2">
-                                <Label htmlFor="language">Programming Language (Optional)</Label>
-                                <Select name="language">
-                                    <SelectTrigger id="language">
-                                        <SelectValue placeholder="Select language" />
+                                <Label htmlFor="questionType">Question Type</Label>
+                                <Select name="questionType" defaultValue="mcq" required>
+                                    <SelectTrigger id="questionType">
+                                        <SelectValue placeholder="Select question type" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="javascript">JavaScript</SelectItem>
-                                        <SelectItem value="python">Python</SelectItem>
-                                        <SelectItem value="java">Java</SelectItem>
-                                        <SelectItem value="cpp">C++</SelectItem>
+                                        <SelectItem value="mcq">MCQ Only</SelectItem>
+                                        <SelectItem value="coding">Coding Only</SelectItem>
+                                        <SelectItem value="mixed">MCQ + Coding</SelectItem>
                                     </SelectContent>
                                 </Select>
                             </div>
@@ -197,6 +196,20 @@ export default function GenerateQuizPage() {
                                     </SelectContent>
                                 </Select>
                             </div>
+                        </div>
+                        <div className="grid gap-2">
+                            <Label htmlFor="language">Programming Language (Optional)</Label>
+                            <Select name="language">
+                                <SelectTrigger id="language">
+                                    <SelectValue placeholder="Select language" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="javascript">JavaScript</SelectItem>
+                                    <SelectItem value="python">Python</SelectItem>
+                                    <SelectItem value="java">Java</SelectItem>
+                                    <SelectItem value="cpp">C++</SelectItem>
+                                </SelectContent>
+                            </Select>
                         </div>
                         <div className="grid gap-2">
                             <Label htmlFor="numberOfQuestions">Number of Questions</Label>

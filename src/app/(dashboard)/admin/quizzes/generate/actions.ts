@@ -19,6 +19,7 @@ const GenerateQuizSchema = z.object({
   customPrompt: z.string().optional(),
   complexity: z.enum(['easy', 'medium', 'hard']),
   numberOfQuestions: z.coerce.number().int().min(1).max(30),
+  questionType: z.enum(['mcq', 'coding', 'mixed']),
 });
 
 export async function generateQuizAction(prevState: any, formData: FormData) {
@@ -30,16 +31,17 @@ export async function generateQuizAction(prevState: any, formData: FormData) {
       customPrompt: formData.get('customPrompt') || undefined,
       complexity: formData.get('complexity'),
       numberOfQuestions: formData.get('numberOfQuestions'),
+      questionType: formData.get('questionType'),
     });
 
     if (!validatedFields.success) {
       return { success: false, message: validatedFields.error.errors.map(e => e.message).join(', ') };
     }
 
-    const { category, subCategory, language, customPrompt, complexity, numberOfQuestions } = validatedFields.data;
+    const { category, subCategory, language, customPrompt, complexity, numberOfQuestions, questionType } = validatedFields.data;
 
     // Call the Genkit flow to generate the quiz content
-    const aiResult = await generateQuiz({ category, subCategory, language, customPrompt, complexity, numberOfQuestions });
+    const aiResult = await generateQuiz({ category, subCategory, language, customPrompt, complexity, numberOfQuestions, questionType });
     
     if (!aiResult || !aiResult.quiz || !aiResult.questions) {
       return { success: false, message: "AI failed to generate quiz content. Please try again." };

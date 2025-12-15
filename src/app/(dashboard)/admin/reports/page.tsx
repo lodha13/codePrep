@@ -76,6 +76,8 @@ export default function ReportsPage() {
     const [rankingSkillFilter, setRankingSkillFilter] = useState<string>("");
     const [sortBy, setSortBy] = useState<string>("percentage");
     const [sortOrder, setSortOrder] = useState<string>("desc");
+    const [assignmentSortBy, setAssignmentSortBy] = useState<string>("avgScore");
+    const [assignmentSortOrder, setAssignmentSortOrder] = useState<string>("desc");
 
     useEffect(() => {
         fetchData();
@@ -90,7 +92,7 @@ export default function ReportsPage() {
             generateIncompleteReport();
             generateRankings();
         }
-    }, [users, quizzes, results, selectedQuiz, showOnBenchOnly, nameFilter, skillFilter, rankingNameFilter, rankingSkillFilter, sortBy, sortOrder]);
+    }, [users, quizzes, results, selectedQuiz, showOnBenchOnly, nameFilter, skillFilter, rankingNameFilter, rankingSkillFilter, sortBy, sortOrder, assignmentSortBy, assignmentSortOrder]);
 
     const fetchUserResults = async (userId: string) => {
         setLoadingResults(true);
@@ -227,7 +229,41 @@ export default function ReportsPage() {
                     return quiz ? quiz.title : "Unknown Quiz";
                 })
             };
-        }).sort((a, b) => b.avgScore - a.avgScore); // Sort by average score descending
+        });
+
+        // Sort the array based on current sort settings
+        incomplete.sort((a, b) => {
+            let aVal, bVal;
+            switch (assignmentSortBy) {
+                case 'name':
+                    aVal = a.userName.toLowerCase();
+                    bVal = b.userName.toLowerCase();
+                    break;
+                case 'skill':
+                    aVal = a.primarySkill.toLowerCase();
+                    bVal = b.primarySkill.toLowerCase();
+                    break;
+                case 'benchAge':
+                    aVal = a.benchAge;
+                    bVal = b.benchAge;
+                    break;
+                case 'progress':
+                    aVal = a.progressPercentage;
+                    bVal = b.progressPercentage;
+                    break;
+                case 'avgScore':
+                default:
+                    aVal = a.avgScore;
+                    bVal = b.avgScore;
+                    break;
+            }
+            
+            if (assignmentSortOrder === 'asc') {
+                return aVal > bVal ? 1 : -1;
+            } else {
+                return aVal < bVal ? 1 : -1;
+            }
+        });
 
         setIncompleteUsers(incomplete);
     };
@@ -369,7 +405,24 @@ export default function ReportsPage() {
                             <TableRow>
                                 <TableHead>
                                     <div className="space-y-2">
-                                        <div>Candidate</div>
+                                        <div className="flex items-center gap-1">
+                                            <span>Candidate</span>
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={() => {
+                                                    if (assignmentSortBy === 'name') {
+                                                        setAssignmentSortOrder(assignmentSortOrder === 'asc' ? 'desc' : 'asc');
+                                                    } else {
+                                                        setAssignmentSortBy('name');
+                                                        setAssignmentSortOrder('asc');
+                                                    }
+                                                }}
+                                                className="h-6 w-6 p-0"
+                                            >
+                                                {assignmentSortBy === 'name' ? (assignmentSortOrder === 'asc' ? '↑' : '↓') : '↕'}
+                                            </Button>
+                                        </div>
                                         <Input
                                             placeholder="Filter by name..."
                                             value={nameFilter}
@@ -380,7 +433,24 @@ export default function ReportsPage() {
                                 </TableHead>
                                 <TableHead>
                                     <div className="space-y-2">
-                                        <div>Primary Skill</div>
+                                        <div className="flex items-center gap-1">
+                                            <span>Primary Skill</span>
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={() => {
+                                                    if (assignmentSortBy === 'skill') {
+                                                        setAssignmentSortOrder(assignmentSortOrder === 'asc' ? 'desc' : 'asc');
+                                                    } else {
+                                                        setAssignmentSortBy('skill');
+                                                        setAssignmentSortOrder('asc');
+                                                    }
+                                                }}
+                                                className="h-6 w-6 p-0"
+                                            >
+                                                {assignmentSortBy === 'skill' ? (assignmentSortOrder === 'asc' ? '↑' : '↓') : '↕'}
+                                            </Button>
+                                        </div>
                                         <Input
                                             placeholder="Filter by skill..."
                                             value={skillFilter}
@@ -389,9 +459,66 @@ export default function ReportsPage() {
                                         />
                                     </div>
                                 </TableHead>
-                                <TableHead>Bench Age</TableHead>
-                                <TableHead>Progress</TableHead>
-                                <TableHead>Avg Score</TableHead>
+                                <TableHead>
+                                    <div className="flex items-center gap-1">
+                                        <span>Bench Age</span>
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() => {
+                                                if (assignmentSortBy === 'benchAge') {
+                                                    setAssignmentSortOrder(assignmentSortOrder === 'asc' ? 'desc' : 'asc');
+                                                } else {
+                                                    setAssignmentSortBy('benchAge');
+                                                    setAssignmentSortOrder('desc');
+                                                }
+                                            }}
+                                            className="h-6 w-6 p-0"
+                                        >
+                                            {assignmentSortBy === 'benchAge' ? (assignmentSortOrder === 'asc' ? '↑' : '↓') : '↕'}
+                                        </Button>
+                                    </div>
+                                </TableHead>
+                                <TableHead>
+                                    <div className="flex items-center gap-1">
+                                        <span>Progress</span>
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() => {
+                                                if (assignmentSortBy === 'progress') {
+                                                    setAssignmentSortOrder(assignmentSortOrder === 'asc' ? 'desc' : 'asc');
+                                                } else {
+                                                    setAssignmentSortBy('progress');
+                                                    setAssignmentSortOrder('desc');
+                                                }
+                                            }}
+                                            className="h-6 w-6 p-0"
+                                        >
+                                            {assignmentSortBy === 'progress' ? (assignmentSortOrder === 'asc' ? '↑' : '↓') : '↕'}
+                                        </Button>
+                                    </div>
+                                </TableHead>
+                                <TableHead>
+                                    <div className="flex items-center gap-1">
+                                        <span>Avg Score</span>
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() => {
+                                                if (assignmentSortBy === 'avgScore') {
+                                                    setAssignmentSortOrder(assignmentSortOrder === 'asc' ? 'desc' : 'asc');
+                                                } else {
+                                                    setAssignmentSortBy('avgScore');
+                                                    setAssignmentSortOrder('desc');
+                                                }
+                                            }}
+                                            className="h-6 w-6 p-0"
+                                        >
+                                            {assignmentSortBy === 'avgScore' ? (assignmentSortOrder === 'asc' ? '↑' : '↓') : '↕'}
+                                        </Button>
+                                    </div>
+                                </TableHead>
                                 <TableHead>Completed</TableHead>
                                 <TableHead>Pending</TableHead>
                                 <TableHead>Actions</TableHead>
