@@ -27,7 +27,7 @@ export default function CandidateLayout({
     const router = useRouter();
 
     useEffect(() => {
-        if (!loading && role && role !== 'candidate') {
+        if (!loading && role && role !== 'candidate' && role !== 'admin') {
             router.push('/admin');
         }
     }, [role, loading, router]);
@@ -38,7 +38,7 @@ export default function CandidateLayout({
         return name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
     }
 
-    if (loading || role !== 'candidate') {
+    if (loading || (role !== 'candidate' && role !== 'admin')) {
         return <div className="flex h-screen w-screen items-center justify-center">Loading dashboard...</div>;
     }
 
@@ -46,10 +46,17 @@ export default function CandidateLayout({
         <div className="min-h-screen bg-background font-body">
             <header className="sticky top-0 z-30 flex h-16 items-center justify-between gap-4 border-b bg-white px-4 md:px-6">
                 <div className="flex items-center gap-8">
-                    <Link href="/candidate" className="flex items-center gap-2 font-bold text-lg">
-                        <Code className="h-6 w-6 text-primary" />
-                        CodePrep Pro
-                    </Link>
+                    <div className="flex items-center gap-2">
+                        <Link href="/candidate" className="flex items-center gap-2 font-bold text-lg">
+                            <Code className="h-6 w-6 text-primary" />
+                            CodePrep Pro
+                        </Link>
+                        {role === 'admin' && (
+                            <span className="text-xs bg-red-100 text-red-800 px-2 py-1 rounded-full ml-2">
+                                Admin View
+                            </span>
+                        )}
+                    </div>
                     <nav className="hidden md:flex items-center gap-6 text-sm font-medium">
                         <Link href="/candidate" className="text-foreground transition-colors hover:text-foreground/80">Prepare</Link>
                         <Link href="#" className="text-muted-foreground transition-colors hover:text-foreground/80">Certify</Link>
@@ -58,6 +65,15 @@ export default function CandidateLayout({
                 </div>
 
                 <div className="flex items-center gap-4">
+                    {role === 'admin' && (
+                        <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => router.push('/admin')}
+                        >
+                            Back to Admin
+                        </Button>
+                    )}
                     <div className="relative hidden md:block">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                         <Input placeholder="Search..." className="pl-9" />

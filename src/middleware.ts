@@ -27,6 +27,11 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL('/candidate', request.url));
   }
 
+  // Allow navigation between admin and candidate sections for authenticated users
+  if (hasSessionCookie && (pathname.startsWith('/admin') || pathname.startsWith('/candidate'))) {
+    return NextResponse.next();
+  }
+
   // If the user does not have a session cookie and is trying to access a protected route,
   // redirect them to the login page.
   if (!hasSessionCookie && !isPublicRoute) {
