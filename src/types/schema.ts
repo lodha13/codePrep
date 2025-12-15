@@ -1,3 +1,4 @@
+
 import { Timestamp } from "firebase/firestore";
 
 export type UserRole = "admin" | "candidate";
@@ -7,7 +8,10 @@ export interface User {
     email: string;
     displayName?: string;
     role: UserRole;
-    createdAt: Timestamp;
+    createdAt: Date; // Changed to Date for consistency
+    completedQuizIds?: string[];
+    assignedQuizIds?: string[];
+    photoURL?: string;
 }
 
 export interface Quiz {
@@ -19,21 +23,23 @@ export interface Quiz {
     subCategory?: string;
     type: "assessment" | "practice";
     questionIds: string[];
-    createdBy: string;
-    createdAt: Timestamp;
+    createdBy: string; // User ID
+    createdAt: Date;
     isPublic: boolean;
+    difficulty?: "easy" | "medium" | "hard";
 }
 
 export type QuestionType = "mcq" | "coding";
 
 export interface BaseQuestion {
     id: string;
-    quizId?: string; // Optional, as questions might be in a bank
     title: string;
     description: string; // Markdown supported
     type: QuestionType;
     difficulty: "easy" | "medium" | "hard";
-    createdAt: Timestamp;
+    createdAt: Date;
+    // New property for image-based questions
+    imageUrl?: string;
 }
 
 export interface MCQQuestion extends BaseQuestion {
@@ -45,12 +51,12 @@ export interface MCQQuestion extends BaseQuestion {
 export interface TestCase {
     input: string;
     expectedOutput: string;
-    isHidden?: boolean;
+    isHidden: boolean; // Control visibility to candidate
 }
 
 export interface CodingQuestion extends BaseQuestion {
     type: "coding";
-    language: "javascript" | "python" | "java" | "cpp"; // default language
+    language: "javascript" | "python" | "java" | "cpp";
     starterCode: string;
     testCases: TestCase[];
     solutionCode?: string; // For reference/grading
@@ -58,21 +64,31 @@ export interface CodingQuestion extends BaseQuestion {
 
 export type Question = MCQQuestion | CodingQuestion;
 
+// This mirrors the TestCaseResult in code-execution.ts
+export interface TestCaseResult {
+    input: string;
+    expected: string;
+    actual: string;
+    passed: boolean;
+}
+
 export interface QuestionResult {
     questionId: string;
     timeTakenSeconds: number;
     status: "correct" | "incorrect" | "partial";
     score: number;
+    total: number; // The maximum possible score for this question.
     userAnswer?: string | number; // Index for MCQ, Code for Coding
-    output?: string; // For coding questions
+    testCaseResults?: TestCaseResult[]; // For coding questions
 }
 
 export interface QuizResult {
     id: string;
     quizId: string;
+    quizTitle: string; // Denormalized for faster reads
     userId: string;
-    startedAt: Timestamp;
-    completedAt?: Timestamp;
+    startedAt: Date | Timestamp;
+    completedAt?: Date | Timestamp;
     score: number;
     totalScore: number;
     status: "in-progress" | "completed";

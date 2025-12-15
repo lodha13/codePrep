@@ -1,10 +1,12 @@
+
 "use client";
 
 import { createContext, useContext, useEffect, useState } from "react";
 import { User as FirebaseUser, onAuthStateChanged, signOut as firebaseSignOut } from "firebase/auth";
 import { auth, db } from "@/lib/firebase";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, getDoc, setDoc } from "firebase/firestore";
 import { User, UserRole } from "@/types/schema";
+import { useRouter, usePathname } from "next/navigation";
 
 interface AuthContextType {
     user: User | null; // Our schema User
@@ -22,36 +24,87 @@ const AuthContext = createContext<AuthContextType>({
     signOut: async () => { },
 });
 
+// Helper function to set a cookie
+function setCookie(name: string, value: string, days: number) {
+    let expires = "";
+    if (days) {
+        const date = new Date();
+        date.setTime(date.getTime() + (days*24*60*60*1000));
+        expires = "; expires=" + date.toUTCString();
+    }
+    if (typeof document !== 'undefined') {
+        document.cookie = name + "=" + (value || "")  + expires + "; path=/";
+    }
+}
+
+function eraseCookie(name: string) {   
+    if (typeof document !== 'undefined') {
+        document.cookie = name+'=; Max-Age=-99999999;';  
+    }
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
     const [user, setUser] = useState<User | null>(null);
     const [loading, setLoading] = useState(true);
+    const router = useRouter();
+    const pathname = usePathname();
 
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
             setFirebaseUser(fbUser);
             if (fbUser) {
-                // Fetch user profile from Firestore
-                const userDoc = await getDoc(doc(db, "users", fbUser.uid));
+                setCookie('__session', 'true', 1);
+
+                const userDocRef = doc(db, "users", fbUser.uid);
+                const userDoc = await getDoc(userDocRef);
+                let appUser: User | null = null;
                 if (userDoc.exists()) {
-                    setUser(userDoc.data() as User);
+                    appUser = userDoc.data() as User;
                 } else {
-                    // If user exists in Auth but not Firestore, it might be a new registration
-                    // The registration component should handle creating the user doc
-                    setUser(null);
+                    const newUser: User = {
+                        uid: fbUser.uid,
+                        email: fbUser.email!,
+                        displayName: fbUser.displayName || 'New User',
+                        role: "candidate", // Default role
+                        createdAt: new Date(),
+                    };
+                    await setDoc(userDocRef, newUser);
+                    appUser = newUser;
+                }
+                setUser(appUser);
+                
+                // Client-side redirect after login
+                const isAuthRoute = pathname === '/login' || pathname === '/register';
+                if (isAuthRoute) {
+                    if (appUser?.role === 'admin') {
+                        router.push('/admin');
+                    } else {
+                        router.push('/candidate');
+                    }
                 }
             } else {
+                eraseCookie('__session');
                 setUser(null);
             }
             setLoading(false);
         });
 
         return () => unsubscribe();
+    // The dependency array is intentionally empty to only run this on mount.
+    // The router and pathname are available within the callback's scope.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     const signOut = async () => {
         await firebaseSignOut(auth);
+        eraseCookie('__session'); // Ensure cookie is removed on sign out
+        router.push('/login'); // Redirect to login after sign out
     };
+
+    if (loading) {
+        return <div className="flex h-screen w-screen items-center justify-center">Loading...</div>;
+    }
 
     return (
         <AuthContext.Provider
