@@ -27,14 +27,7 @@ export default function QuizPage() {
 
             setLoading(true);
 
-            // 1. Check if the user has already COMPLETED this quiz
-            if (user.completedQuizIds?.includes(quizId as string)) {
-                 setAlreadyCompleted(true);
-                 setLoading(false);
-                 return;
-            }
-
-            // 2. Fetch quiz data first
+            // 1. Fetch quiz data first
             const quizRef = doc(db, "quizzes", quizId as string);
             const quizSnap = await getDoc(quizRef);
 
@@ -46,10 +39,10 @@ export default function QuizPage() {
             const currentQuiz = { id: quizSnap.id, ...quizSnap.data() } as Quiz;
             setQuiz(currentQuiz);
 
-            // 3. Get or create session using helper function
+            // 2. Get or create session using helper function
             const session = await getOrCreateQuizSession(user.uid, quizId as string, currentQuiz.title) as QuizResult;
             
-            // 4. Double-check if session is completed (in case of race condition)
+            // 3. Check if session is already completed - this is the authoritative check
             if (session.status === 'completed') {
                 setAlreadyCompleted(true);
                 setLoading(false);
@@ -58,7 +51,7 @@ export default function QuizPage() {
 
             setQuizSession(session);
 
-            // 5. Fetch questions for the quiz
+            // 4. Fetch questions for the quiz
             if (session && currentQuiz?.questionIds?.length) {
                 const qQuery = query(collection(db, "questions"), where(documentId(), "in", currentQuiz.questionIds));
                 const qSnap = await getDocs(qQuery);

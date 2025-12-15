@@ -1,19 +1,19 @@
 
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Quiz, Question, QuestionResult, QuizResult, MCQQuestion, CodingQuestion } from "@/types/schema";
 import { Button } from "@/components/ui/button";
 import MCQView from "./MCQView";
 import CodingView from "./CodingView";
-import { doc, Timestamp, writeBatch, updateDoc, arrayUnion } from "firebase/firestore";
+import { doc, Timestamp, writeBatch, arrayUnion } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
 import { Flag, ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { executeCode } from "@/lib/code-execution";
-import { useDebouncedCallback } from "use-debounce";
+
 
 interface QuizRunnerProps {
     quiz: Quiz;
@@ -23,12 +23,34 @@ interface QuizRunnerProps {
 
 export default function QuizRunner({ quiz, questions, session }: QuizRunnerProps) {
     const [currentIndex, setCurrentIndex] = useState(0);
-    const [answers, setAnswers] = useState<Record<string, { userAnswer: string }>>(() => session.answers || {});
+    const [answers, setAnswers] = useState<Record<string, { userAnswer: string }>>(() => {
+        // Try to load from localStorage first, fallback to session.answers
+        if (typeof window !== 'undefined') {
+            const saved = localStorage.getItem(`quiz-${session.id}-answers`);
+            if (saved) {
+                try {
+                    return JSON.parse(saved);
+                } catch (e) {
+                    console.warn('Failed to parse saved answers:', e);
+                }
+            }
+        }
+        return session.answers || {};
+    });
     const [flagged, setFlagged] = useState<Record<string, boolean>>({});
     const [submitting, setSubmitting] = useState(false);
+    const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+    const [isCompleting, setIsCompleting] = useState(false);
     
     const { user, updateUserCache } = useAuth();
     const router = useRouter();
+
+    // Cleanup localStorage on component mount if quiz is already completed
+    useEffect(() => {
+        if (session.status === 'completed' && typeof window !== 'undefined') {
+            localStorage.removeItem(`quiz-${session.id}-answers`);
+        }
+    }, [session.id, session.status]);
 
     const handleSubmit = async () => {
         if (!user || submitting) return;
@@ -46,6 +68,7 @@ export default function QuizRunner({ quiz, questions, session }: QuizRunnerProps
         }
         
         setSubmitting(true);
+        setIsCompleting(true);
         
         let totalQuizScore = 0;
         let maxQuizScore = 0;
@@ -134,28 +157,25 @@ export default function QuizRunner({ quiz, questions, session }: QuizRunnerProps
             timeTakenSeconds
         });
         
-        // Optimistic update - immediate UI feedback
-        updateUserCache({ 
-            completedQuizIds: [...(user.completedQuizIds || []), quiz.id] 
-        });
-        
         const userDocRef = doc(db, "users", user.uid);
         batch.update(userDocRef, {
             completedQuizIds: arrayUnion(quiz.id)
         });
 
         await batch.commit();
-
-        router.push(`/results/${session.id}`);
+        
+        // Clear localStorage after successful submission
+        if (typeof window !== 'undefined') {
+            localStorage.removeItem(`quiz-${session.id}-answers`);
+        }
+        
+        setHasUnsavedChanges(false);
+        
+        // Navigate directly to results - no cache update needed here
+        router.replace(`/results/${session.id}`);
     };
     
-    const saveProgress = useDebouncedCallback(async (newAnswers: Record<string, { userAnswer: string }>) => {
-        if (!session || !user) return;
-        const resultDocRef = doc(db, "results", session.id);
-        await updateDoc(resultDocRef, {
-            answers: newAnswers,
-        });
-    }, 1500);
+
 
     const handleAnswer = (val: string) => {
         const newAnswers = { 
@@ -165,7 +185,12 @@ export default function QuizRunner({ quiz, questions, session }: QuizRunnerProps
             }
         };
         setAnswers(newAnswers);
-        saveProgress(newAnswers);
+        setHasUnsavedChanges(true);
+        
+        // Save to localStorage for persistence across page refreshes
+        if (typeof window !== 'undefined') {
+            localStorage.setItem(`quiz-${session.id}-answers`, JSON.stringify(newAnswers));
+        }
     };
 
     const handleNavigation = () => {
@@ -234,6 +259,11 @@ export default function QuizRunner({ quiz, questions, session }: QuizRunnerProps
                     </div>
                 </div>
                  <div className="p-4 border-t">
+                     {hasUnsavedChanges && (
+                         <p className="text-xs text-amber-600 mb-2 text-center">
+                             💾 Answers saved locally - Submit to save permanently
+                         </p>
+                     )}
                      <Button onClick={() => handleSubmit()} disabled={submitting} className="w-full">
                         {submitting ? "Submitting..." : "Submit Quiz"}
                     </Button>
@@ -264,7 +294,7 @@ export default function QuizRunner({ quiz, questions, session }: QuizRunnerProps
                         <Flag className={cn("h-4 w-4", flagged[currentQuestion.id] && "text-yellow-500 fill-yellow-400")} />
                     </Button>
                     <Button onClick={handleNavigation} disabled={submitting}>
-                        {isLastQuestion ? 'Finish & Submit' : 'Save & Next'}
+                        {isLastQuestion ? 'Finish & Submit' : 'Next'}
                          {!isLastQuestion && <ChevronRight className="h-4 w-4 ml-1"/>}
                     </Button>
                 </div>
