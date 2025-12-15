@@ -27,7 +27,7 @@ export default function QuizRunner({ quiz, questions, session }: QuizRunnerProps
     const [flagged, setFlagged] = useState<Record<string, boolean>>({});
     const [submitting, setSubmitting] = useState(false);
     
-    const { user } = useAuth();
+    const { user, updateUserCache } = useAuth();
     const router = useRouter();
 
     const handleSubmit = async () => {
@@ -132,6 +132,11 @@ export default function QuizRunner({ quiz, questions, session }: QuizRunnerProps
             status: "completed",
             completedAt,
             timeTakenSeconds
+        });
+        
+        // Optimistic update - immediate UI feedback
+        updateUserCache({ 
+            completedQuizIds: [...(user.completedQuizIds || []), quiz.id] 
         });
         
         const userDocRef = doc(db, "users", user.uid);

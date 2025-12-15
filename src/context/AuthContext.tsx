@@ -9,11 +9,12 @@ import { User, UserRole } from "@/types/schema";
 import { useRouter, usePathname } from "next/navigation";
 
 interface AuthContextType {
-    user: User | null; // Our schema User
+    user: User | null;
     firebaseUser: FirebaseUser | null;
     loading: boolean;
     role: UserRole | null;
     signOut: () => Promise<void>;
+    updateUserCache: (updates: Partial<User>) => void;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -22,6 +23,7 @@ const AuthContext = createContext<AuthContextType>({
     loading: true,
     role: null,
     signOut: async () => { },
+    updateUserCache: () => { },
 });
 
 // Helper function to set a cookie
@@ -49,6 +51,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [loading, setLoading] = useState(true);
     const router = useRouter();
     const pathname = usePathname();
+
+    // Simple cache update function for optimistic updates
+    const updateUserCache = (updates: Partial<User>) => {
+        if (user) {
+            setUser(prev => prev ? { ...prev, ...updates } : null);
+        }
+    };
 
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
@@ -114,6 +123,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 loading,
                 role: user?.role || null,
                 signOut,
+                updateUserCache,
             }}
         >
             {children}
