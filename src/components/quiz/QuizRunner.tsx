@@ -24,7 +24,7 @@ interface QuizRunnerProps {
 export default function QuizRunner({ quiz, questions, session }: QuizRunnerProps) {
     const [currentIndex, setCurrentIndex] = useState(0);
     const [answers, setAnswers] = useState<Record<string, { userAnswer: string }>>(() => {
-        // Try to load from localStorage first, fallback to session.answers
+        // Only load from localStorage for current session, never from database
         if (typeof window !== 'undefined') {
             const saved = localStorage.getItem(`quiz-${session.id}-answers`);
             if (saved) {
@@ -35,7 +35,7 @@ export default function QuizRunner({ quiz, questions, session }: QuizRunnerProps
                 }
             }
         }
-        return session.answers || {};
+        return {}; // Start fresh, no pre-populated answers
     });
     const [flagged, setFlagged] = useState<Record<string, boolean>>({});
     const [submitting, setSubmitting] = useState(false);
@@ -45,12 +45,20 @@ export default function QuizRunner({ quiz, questions, session }: QuizRunnerProps
     const { user, updateUserCache } = useAuth();
     const router = useRouter();
 
-    // Cleanup localStorage on component mount if quiz is already completed
+    // Cleanup localStorage on component mount and unmount
     useEffect(() => {
-        if (session.status === 'completed' && typeof window !== 'undefined') {
+        // Clean up any existing localStorage for this session on mount
+        if (typeof window !== 'undefined') {
             localStorage.removeItem(`quiz-${session.id}-answers`);
         }
-    }, [session.id, session.status]);
+        
+        // Cleanup on unmount
+        return () => {
+            if (typeof window !== 'undefined') {
+                localStorage.removeItem(`quiz-${session.id}-answers`);
+            }
+        };
+    }, [session.id]);
 
     const handleSubmit = async () => {
         if (!user || submitting) return;
