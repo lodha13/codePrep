@@ -9,8 +9,8 @@ import { executeCode, ExecutionResult } from "@/lib/code-execution";
 import { Card, CardContent } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Separator } from "@/components/ui/separator";
-import { CheckCircle, XCircle } from "lucide-react";
+import { CheckCircle, XCircle, PanelLeft, PanelLeftOpen, PanelBottom, PanelBottomOpen } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface CodingViewProps {
     question: CodingQuestion;
@@ -23,17 +23,29 @@ export default function CodingView({ question, onCodeChange, currentCode }: Codi
     const [executing, setExecuting] = useState(false);
     const [activeTab, setActiveTab] = useState("testcases");
 
+    // Layout State
+    const [leftPanelCollapsed, setLeftPanelCollapsed] = useState(false);
+    const [bottomPanelCollapsed, setBottomPanelCollapsed] = useState(true);
+
+    const toggleBottomPanel = () => {
+        setBottomPanelCollapsed(prev => !prev);
+    }
+
     const handleRun = async () => {
         setExecuting(true);
         setExecutionResult(null);
         setActiveTab("output");
+        
+        // Open the console if it's closed
+        if (bottomPanelCollapsed) {
+            toggleBottomPanel();
+        }
+
         try {
             const visibleTestCases = question.testCases.filter(tc => !tc.isHidden);
             const result = await executeCode(currentCode, question.language, visibleTestCases);
             setExecutionResult(result);
         } catch (err) {
-            // Re-throw the error so Next.js can handle it and display a proper error overlay.
-            // This helps in debugging application-level errors instead of swallowing them.
             throw err;
         } finally {
             setExecuting(false);
@@ -41,21 +53,11 @@ export default function CodingView({ question, onCodeChange, currentCode }: Codi
     };
     
     const renderOutput = () => {
-        if (executing) {
-            return "Executing...";
-        }
-        if (!executionResult) {
-            return "Run code to see output...";
-        }
-        if (executionResult.compile_output) {
-            return <span className="text-red-500">{executionResult.compile_output}</span>;
-        }
-        if (executionResult.stderr && !executionResult.test_case_results) {
-            return <span className="text-red-500">{executionResult.stderr}</span>;
-        }
-        if (!executionResult.test_case_results) {
-            return "No test case results available.";
-        }
+        if (executing) return "Executing...";
+        if (!executionResult) return "Run code to see output...";
+        if (executionResult.compile_output) return <span className="text-destructive">{executionResult.compile_output}</span>;
+        if (executionResult.stderr && !executionResult.test_case_results) return <span className="text-destructive">{executionResult.stderr}</span>;
+        if (!executionResult.test_case_results) return "No test case results available.";
 
         return (
             <div className="space-y-4">
@@ -63,75 +65,144 @@ export default function CodingView({ question, onCodeChange, currentCode }: Codi
                     <div key={i}>
                         <div className="flex items-center gap-2 mb-2">
                             {res.passed ? <CheckCircle className="h-5 w-5 text-green-500"/> : <XCircle className="h-5 w-5 text-red-500"/>}
-                            <h4 className="font-semibold text-white">Test Case {i + 1}</h4>
-                            <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${res.passed ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
+                            <h4 className="font-semibold">Test Case {i + 1}</h4>
+                            <span className={cn(
+                                "text-xs font-bold px-2 py-0.5 rounded-full",
+                                res.passed ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                            )}>
                                 {res.passed ? 'Passed' : 'Failed'}
                             </span>
                         </div>
-                        <Card className="bg-gray-800 border-gray-700 text-gray-300 font-mono text-sm p-3">
-                            <p><span className="font-semibold text-gray-400">Input:</span> {res.input}</p>
-                            <p><span className="font-semibold text-gray-400">Expected:</span> {res.expected}</p>
-                            <p><span className="font-semibold text-gray-400">Your Output:</span> {res.actual}</p>
+                        <Card className="bg-muted border-border p-3 font-mono text-sm">
+                            <p><span className="font-semibold text-muted-foreground">Input:</span> {res.input}</p>
+                            <p><span className="font-semibold text-muted-foreground">Expected:</span> {res.expected}</p>
+                            <p><span className="font-semibold text-muted-foreground">Your Output:</span> {res.actual}</p>
                         </Card>
                     </div>
                 ))}
             </div>
-        )
-    }
+        );
+    };
 
     return (
-        <div className="flex h-full flex-col lg:flex-row">
-            <div className="lg:w-1/2 p-4 flex flex-col">
-                <ScrollArea className="flex-1">
-                    <div className="prose prose-sm max-w-none mb-4">
-                        <h2 className="text-xl font-bold">{question.title}</h2>
-                        <div dangerouslySetInnerHTML={{ __html: question.description }} />
-                    </div>
-                </ScrollArea>
+        <div className="h-full flex flex-col bg-background text-foreground">
+            {/* Mobile: Tabbed Layout */}
+            <div className="lg:hidden h-full flex flex-col">
+                <Tabs defaultValue="question" className="flex-grow flex flex-col overflow-hidden">
+                    <TabsList className="grid w-full grid-cols-3">
+                        <TabsTrigger value="question">Question</TabsTrigger>
+                        <TabsTrigger value="code">Code</TabsTrigger>
+                        <TabsTrigger value="output">Output</TabsTrigger>
+                    </TabsList>
+                    <TabsContent value="question" className="flex-grow overflow-y-auto p-4">
+                        <div className="prose prose-sm max-w-none">
+                            <h2 className="text-xl font-bold">{question.title}</h2>
+                            <div dangerouslySetInnerHTML={{ __html: question.description }} />
+                        </div>
+                    </TabsContent>
+                    <TabsContent value="code" className="flex-grow flex flex-col">
+                        <div className="flex-1 overflow-hidden">
+                            <Editor
+                                height="100%"
+                                defaultLanguage={question.language}
+                                value={currentCode}
+                                onChange={(val) => onCodeChange(val || "")}
+                                theme="vs-dark"
+                                options={{ minimap: { enabled: false }, fontSize: 13, scrollBeyondLastLine: false }}
+                            />
+                        </div>
+                         <div className="p-2 border-t">
+                            <Button onClick={handleRun} disabled={executing} size="sm" className="w-full">
+                                {executing ? "Running..." : "Run Code"}
+                            </Button>
+                        </div>
+                    </TabsContent>
+                    <TabsContent value="output" className="flex-grow overflow-y-auto p-4 bg-background text-foreground font-mono text-sm">
+                        {renderOutput()}
+                    </TabsContent>
+                </Tabs>
             </div>
-            <Separator orientation="vertical" className="hidden lg:block h-auto" />
-            <div className="lg:w-1/2 flex flex-col h-full">
-                 <div className="flex-grow flex flex-col">
-                    <Editor
-                        height="60%"
-                        defaultLanguage={question.language}
-                        value={currentCode}
-                        onChange={(val) => onCodeChange(val || "")}
-                        theme="vs-dark"
-                        options={{ minimap: { enabled: false }, fontSize: 14, scrollBeyondLastLine: false, automaticLayout: true }}
-                    />
-                    <div className="flex-grow flex flex-col border-t">
-                         <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-grow flex flex-col">
-                            <div className="flex items-center justify-between px-2 border-b">
-                                <TabsList className="rounded-none justify-start bg-transparent border-0 p-0">
-                                    <TabsTrigger value="testcases" className="text-xs data-[state=active]:border-b-2 border-black rounded-none">Testcases</TabsTrigger>
-                                    <TabsTrigger value="output" className="text-xs data-[state=active]:border-b-2 border-black rounded-none">Output</TabsTrigger>
-                                </TabsList>
-                                <Button onClick={handleRun} disabled={executing} size="sm" className="my-1 mr-2">
+
+            {/* Desktop: 2 or 3 Panel Layout */}
+            <div className="hidden lg:flex flex-col flex-grow overflow-hidden">
+                {/* Main Area: Question and Editor */}
+                <div className="flex flex-1 overflow-hidden">
+                    {/* Left Panel: Question */}
+                    <div className={cn("flex flex-col border-r", leftPanelCollapsed ? "hidden" : "w-1/3")}>
+                        <div className="p-2 border-b flex items-center justify-between">
+                            <h3 className="font-semibold text-lg ml-2">Question</h3>
+                            <Button variant="ghost" size="icon" onClick={() => setLeftPanelCollapsed(true)}>
+                                <PanelLeft className="h-5 w-5"/>
+                            </Button>
+                        </div>
+                        <ScrollArea className="flex-1 p-4">
+                            <div className="prose prose-sm max-w-none">
+                                <h2 className="text-xl font-bold">{question.title}</h2>
+                                <div dangerouslySetInnerHTML={{ __html: question.description }} />
+                            </div>
+                        </ScrollArea>
+                    </div>
+                    
+                    {/* Right Panel: Editor */}
+                    <div className="flex-1 flex flex-col overflow-hidden">
+                         <div className="p-2 border-b flex items-center justify-between gap-2 bg-background">
+                             <div className="flex items-center gap-2">
+                                {leftPanelCollapsed && (
+                                     <Button variant="ghost" size="icon" onClick={() => setLeftPanelCollapsed(false)}>
+                                        <PanelLeftOpen className="h-5 w-5"/>
+                                    </Button>
+                                )}
+                                <h3 className="font-semibold">Code Editor</h3>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                 <Button onClick={handleRun} disabled={executing} size="sm">
                                     {executing ? "Running..." : "Run Code"}
+                                 </Button>
+                                <Button variant="outline" size="sm" onClick={toggleBottomPanel}>
+                                    {bottomPanelCollapsed ? <PanelBottom className="h-4 w-4 mr-2" /> : <PanelBottomOpen className="h-4 w-4 mr-2" />}
+                                    Console
                                 </Button>
                             </div>
-                            <TabsContent value="testcases" className="flex-grow p-2 mt-0">
-                               <ScrollArea className="h-full">
-                                    {question.testCases.filter(tc => !tc.isHidden).map((tc, i) => (
-                                        <Card key={i} className="mb-2 bg-gray-50 font-mono text-sm">
-                                            <CardContent className="p-3">
-                                            <p><span className="font-semibold">Input:</span> {tc.input}</p>
-                                            <p><span className="font-semibold">Expected Output:</span> {tc.expectedOutput}</p>
-                                            </CardContent>
-                                        </Card>
-                                    ))}
-                               </ScrollArea>
-                            </TabsContent>
-                             <TabsContent value="output" className="flex-grow p-4 bg-gray-900 text-white mt-0">
-                               <ScrollArea className="h-full">
-                                    <div className="text-sm font-mono whitespace-pre-wrap">
-                                        {renderOutput()}
-                                    </div>
-                               </ScrollArea>
-                            </TabsContent>
-                        </Tabs>
+                        </div>
+                        <div className="flex-1 overflow-hidden relative">
+                             <Editor
+                                defaultLanguage={question.language}
+                                value={currentCode}
+                                onChange={(val) => onCodeChange(val || "")}
+                                theme="vs-dark"
+                                options={{ minimap: { enabled: false }, fontSize: 13, scrollBeyondLastLine: false, automaticLayout: true }}
+                            />
+                        </div>
                     </div>
+                </div>
+                
+                {/* Bottom Panel: Output */}
+                <div className={cn("flex flex-col border-t", bottomPanelCollapsed ? "hidden" : "h-1/3")}>
+                    <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-grow flex flex-col bg-background text-foreground">
+                        <TabsList className="rounded-none justify-start px-2 border-b bg-secondary">
+                            <TabsTrigger value="testcases" className="text-xs rounded-none data-[state=active]:bg-background">Test Cases</TabsTrigger>
+                            <TabsTrigger value="output" className="text-xs rounded-none data-[state=active]:bg-background">Output</TabsTrigger>
+                        </TabsList>
+                        <TabsContent value="testcases" className="flex-grow mt-0 overflow-y-auto">
+                           <ScrollArea className="h-full p-4">
+                                {question.testCases.filter(tc => !tc.isHidden).map((tc, i) => (
+                                    <Card key={i} className="mb-2 bg-muted p-3 font-mono text-sm">
+                                        <CardContent className="p-0">
+                                            <p><span className="font-semibold text-muted-foreground">Input:</span> {tc.input}</p>
+                                            <p><span className="font-semibold text-muted-foreground">Expected Output:</span> {tc.expectedOutput}</p>
+                                        </CardContent>
+                                    </Card>
+                                ))}
+                           </ScrollArea>
+                        </TabsContent>
+                        <TabsContent value="output" className="flex-grow mt-0 overflow-y-auto">
+                           <ScrollArea className="h-full p-4">
+                                <div className="text-sm font-mono whitespace-pre-wrap">
+                                    {renderOutput()}
+                                </div>
+                           </ScrollArea>
+                        </TabsContent>
+                    </Tabs>
                 </div>
             </div>
         </div>
