@@ -2,12 +2,16 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { User, UserRole, QuizResult } from '@/types/schema';
+import { User, UserRole, QuizResult, Group } from '@/types/schema';
 import { updateUserRole } from './actions';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { Switch } from '@/components/ui/switch';
+import { getGroups } from '@/lib/admin-utils';
+import { doc, updateDoc } from 'firebase/firestore';
+import { useToast } from '@/components/ui/use-toast';
 import {
     Table,
     TableBody,
@@ -30,10 +34,10 @@ import {
     DialogTitle,
     DialogTrigger,
 } from "@/components/ui/dialog";
-import { Search, Eye, Trophy, Calendar, AlertTriangle } from 'lucide-react';
+import { Search, Eye, Trophy, Calendar, AlertTriangle, Edit } from 'lucide-react';
+import Link from 'next/link';
 import { db } from '@/lib/firebase';
 import { collection, query, where, getDocs } from 'firebase/firestore';
-import Link from 'next/link';
 
 
 interface UserManagementClientProps {
@@ -50,6 +54,20 @@ export function UserManagementClient({ initialUsers }: UserManagementClientProps
     const [loadingResults, setLoadingResults] = useState(false);
     const [allQuizzes, setAllQuizzes] = useState<any[]>([]);
     const [userQuizStats, setUserQuizStats] = useState<any>(null);
+    const [groups, setGroups] = useState<Group[]>([]);
+    const { toast } = useToast();
+
+    useEffect(() => {
+        const loadGroups = async () => {
+            try {
+                const groupsData = await getGroups();
+                setGroups(groupsData);
+            } catch (error) {
+                console.error('Error loading groups:', error);
+            }
+        };
+        loadGroups();
+    }, []);
 
     useEffect(() => {
         const filtered = users.filter(user => 
@@ -70,6 +88,18 @@ export function UserManagementClient({ initialUsers }: UserManagementClientProps
             console.error(result.message);
         }
         setLoading(prev => ({ ...prev, [uid]: false }));
+    };
+
+    const handleBenchStatusChange = async (uid: string, isBench: boolean) => {
+        try {
+            await updateDoc(doc(db, "users", uid), { isBench });
+            setUsers(prevUsers =>
+                prevUsers.map(u => (u.uid === uid ? { ...u, isBench } : u))
+            );
+            toast({ title: "Bench status updated" });
+        } catch (error) {
+            toast({ variant: "destructive", title: "Failed to update bench status" });
+        }
     };
 
     const fetchUserResults = async (userId: string) => {
@@ -176,8 +206,9 @@ export function UserManagementClient({ initialUsers }: UserManagementClientProps
                             <TableRow>
                                 <TableHead>Name</TableHead>
                                 <TableHead>Email</TableHead>
-                                <TableHead>Current Role</TableHead>
-                                <TableHead className="w-[180px]">Change Role</TableHead>
+                                <TableHead>Bench Status</TableHead>
+                                <TableHead>Groups</TableHead>
+                                <TableHead className="w-[180px]">Role</TableHead>
                                 <TableHead className="w-[100px]">Actions</TableHead>
                             </TableRow>
                         </TableHeader>
@@ -187,8 +218,14 @@ export function UserManagementClient({ initialUsers }: UserManagementClientProps
                                     <TableCell className="font-medium">{user.displayName || 'N/A'}</TableCell>
                                     <TableCell>{user.email}</TableCell>
                                     <TableCell>
-                                        <Badge variant={user.role === 'admin' ? 'destructive' : 'default'}>
-                                            {user.role}
+                                        <Switch
+                                            checked={user.isBench || false}
+                                            onCheckedChange={(checked) => handleBenchStatusChange(user.uid, checked)}
+                                        />
+                                    </TableCell>
+                                    <TableCell>
+                                        <Badge variant="outline">
+                                            {user.groupIds?.length || 0} groups
                                         </Badge>
                                     </TableCell>
                                     <TableCell>
@@ -207,17 +244,23 @@ export function UserManagementClient({ initialUsers }: UserManagementClientProps
                                         </Select>
                                     </TableCell>
                                     <TableCell>
-                                        {user.role === 'candidate' && (
-                                            <Dialog>
-                                                <DialogTrigger asChild>
-                                                    <Button
-                                                        variant="outline"
-                                                        size="sm"
-                                                        onClick={() => handleViewUser(user)}
-                                                    >
-                                                        <Eye className="h-4 w-4" />
-                                                    </Button>
-                                                </DialogTrigger>
+                                        <div className="flex gap-2">
+                                            <Button variant="outline" size="sm" asChild>
+                                                <Link href={`/admin/users/${user.uid}/edit`}>
+                                                    <Edit className="h-4 w-4" />
+                                                </Link>
+                                            </Button>
+                                            {user.role === 'candidate' && (
+                                                <Dialog>
+                                                    <DialogTrigger asChild>
+                                                        <Button
+                                                            variant="outline"
+                                                            size="sm"
+                                                            onClick={() => handleViewUser(user)}
+                                                        >
+                                                            <Eye className="h-4 w-4" />
+                                                        </Button>
+                                                    </DialogTrigger>
                                                 <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
                                                     <DialogHeader>
                                                         <DialogTitle>Candidate Details: {user.displayName || user.email}</DialogTitle>
@@ -332,7 +375,8 @@ export function UserManagementClient({ initialUsers }: UserManagementClientProps
                                                     )}
                                                 </DialogContent>
                                             </Dialog>
-                                        )}
+                                            )}
+                                        </div>
                                     </TableCell>
                                 </TableRow>
                             ))}

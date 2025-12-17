@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { LayoutDashboard, FileQuestion, Upload, Users, Settings, LogOut, User, BarChart3 } from "lucide-react";
+import { LayoutDashboard, FileQuestion, Upload, Users, Settings, LogOut, User, BarChart3, UsersIcon } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
 
@@ -12,6 +12,7 @@ const navItems = [
     { name: "Quizzes", href: "/admin/quizzes", icon: FileQuestion },
     { name: "Upload Questions", href: "/admin/questions/upload", icon: Upload },
     { name: "Users", href: "/admin/users", icon: Users },
+    { name: "Groups", href: "/admin/groups", icon: UsersIcon },
     { name: "Reports", href: "/admin/reports", icon: BarChart3 },
     { name: "Candidate View", href: "/candidate", icon: User },
     { name: "Settings", href: "/admin/settings", icon: Settings },

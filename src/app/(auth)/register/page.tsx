@@ -4,6 +4,7 @@
 import { useState } from "react";
 import { createUserWithEmailAndPassword } from "firebase/auth";
 import { auth, db } from "@/lib/firebase";
+import { signInWithBounteous } from "@/lib/auth-utils";
 import { useRouter } from "next/navigation";
 import { doc, setDoc } from "firebase/firestore";
 import { User } from "@/types/schema";
@@ -43,10 +44,12 @@ export default function RegisterPage() {
                 uid: user.uid,
                 email: user.email!,
                 displayName: name,
-                role: "candidate", // Default role
+                role: "candidate",
                 createdAt: new Date(),
-                completedQuizIds: [], // Initialize empty array
-                assignedQuizIds: [], // Initialize empty array
+                completedQuizIds: [],
+                assignedQuizIds: [],
+                groupIds: [],
+                isBench: false,
             };
 
             await setDoc(doc(db, "users", user.uid), newUser);
@@ -64,6 +67,22 @@ export default function RegisterPage() {
             } else {
                 setError("An unknown error occurred. Please try again.");
             }
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleBounteousRegister = async () => {
+        setError("");
+        setLoading(true);
+        try {
+            await signInWithBounteous();
+            toast({
+                title: "Account Created!",
+                description: "You have been successfully registered with Bounteous.",
+            });
+        } catch (err: any) {
+            setError("Bounteous sign-up failed. Please try again.");
         } finally {
             setLoading(false);
         }
@@ -126,6 +145,20 @@ export default function RegisterPage() {
                     <CardFooter className="flex flex-col gap-4">
                         <Button className="w-full" type="submit" disabled={loading}>
                             {loading ? "Creating Account..." : "Sign Up"}
+                        </Button>
+                        <div className="relative">
+                            <div className="absolute inset-0 flex items-center">
+                                <span className="w-full border-t" />
+                            </div>
+                            <div className="relative flex justify-center text-xs uppercase">
+                                <span className="bg-background px-2 text-muted-foreground">Or continue with</span>
+                            </div>
+                        </div>
+                        <Button variant="outline" className="w-full" onClick={handleBounteousRegister} disabled={loading}>
+                            <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24">
+                                <path fill="currentColor" d="M11.4 24H0V12.6h11.4V24zM24 24H12.6V12.6H24V24zM11.4 11.4H0V0h11.4v11.4zM24 11.4H12.6V0H24v11.4z"/>
+                            </svg>
+                            Continue with Bounteous
                         </Button>
                         <p className="text-sm text-center text-muted-foreground">
                             Already have an account?{' '}

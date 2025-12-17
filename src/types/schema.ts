@@ -8,26 +8,40 @@ export interface User {
     email: string;
     displayName?: string;
     role: UserRole;
-    createdAt: Date; // Changed to Date for consistency
+    createdAt: Date;
     completedQuizIds?: string[];
     assignedQuizIds?: string[];
     photoURL?: string;
+    groupIds?: string[];
+    isBench?: boolean;
+}
+
+export interface Group {
+    id: string;
+    name: string;
+    description?: string;
+    createdBy: string;
+    createdAt: Date;
+    memberIds: string[];
+    assignedQuizIds?: string[];
 }
 
 export interface Quiz {
     id: string;
     title: string;
     description?: string;
-    durationMinutes: number; // 0 for unlimited
+    durationMinutes: number;
     category: string;
     subCategory?: string;
     type: "assessment" | "practice";
     questionIds: string[];
-    createdBy: string; // User ID
+    createdBy: string;
     createdAt: Date;
     isPublic: boolean;
     difficulty?: "easy" | "medium" | "hard";
     totalMarks?: number;
+    assignedUserIds?: string[];
+    assignedGroupIds?: string[];
 }
 
 export type QuestionType = "mcq" | "coding";

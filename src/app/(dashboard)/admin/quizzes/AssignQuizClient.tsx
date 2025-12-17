@@ -1,8 +1,8 @@
 
 'use client';
 
-import { useState } from 'react';
-import { Quiz, User } from '@/types/schema';
+import { useState, useEffect } from 'react';
+import { Quiz, User, Group } from '@/types/schema';
 import {
     Table,
     TableBody,
@@ -14,7 +14,9 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { UserPlus } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { UserPlus, Edit, Search, Users } from 'lucide-react';
+import Link from 'next/link';
 import {
     Dialog,
     DialogContent,
@@ -24,10 +26,17 @@ import {
     DialogFooter,
     DialogTrigger,
 } from '@/components/ui/dialog';
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipProvider,
+    TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { assignQuizToUsers } from '../actions';
 import { useToast } from '@/components/ui/use-toast';
 import { Checkbox } from '@/components/ui/checkbox';
+import { getGroups, assignQuizToUsersAndGroups } from '@/lib/admin-utils';
 
 
 interface AssignQuizClientProps {
@@ -37,10 +46,36 @@ interface AssignQuizClientProps {
 
 export function AssignQuizClient({ quizzes, candidates }: AssignQuizClientProps) {
     const [isDialogOpen, setIsDialogOpen] = useState(false);
+    const [isBulkDialogOpen, setIsBulkDialogOpen] = useState(false);
     const [selectedQuiz, setSelectedQuiz] = useState<Quiz | null>(null);
     const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
+    const [selectedQuizIds, setSelectedQuizIds] = useState<string[]>([]);
+    const [selectedGroupIds, setSelectedGroupIds] = useState<string[]>([]);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [searchTerm, setSearchTerm] = useState('');
+    const [groups, setGroups] = useState<Group[]>([]);
+    const [filteredQuizzes, setFilteredQuizzes] = useState<Quiz[]>(quizzes);
     const { toast } = useToast();
+
+    useEffect(() => {
+        const loadGroups = async () => {
+            try {
+                const groupsData = await getGroups();
+                setGroups(groupsData);
+            } catch (error) {
+                console.error('Error loading groups:', error);
+            }
+        };
+        loadGroups();
+    }, []);
+
+    useEffect(() => {
+        const filtered = quizzes.filter(quiz =>
+            quiz.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            quiz.category.toLowerCase().includes(searchTerm.toLowerCase())
+        );
+        setFilteredQuizzes(filtered);
+    }, [quizzes, searchTerm]);
 
     const handleAssignClick = (quiz: Quiz) => {
         setSelectedQuiz(quiz);
@@ -83,47 +118,157 @@ export function AssignQuizClient({ quizzes, candidates }: AssignQuizClientProps)
         setIsSubmitting(false);
     };
 
+    const handleBulkAssign = async () => {
+        if (selectedQuizIds.length === 0 || selectedGroupIds.length === 0) {
+            toast({
+                variant: 'destructive',
+                title: "Selection required",
+                description: "Please select quizzes and groups."
+            });
+            return;
+        }
+
+        setIsSubmitting(true);
+        try {
+            for (const quizId of selectedQuizIds) {
+                await assignQuizToUsersAndGroups(quizId, [], selectedGroupIds);
+            }
+            toast({
+                title: "Bulk Assignment Complete!",
+                description: `Assigned ${selectedQuizIds.length} quizzes to ${selectedGroupIds.length} groups.`,
+            });
+            setIsBulkDialogOpen(false);
+            setSelectedQuizIds([]);
+            setSelectedGroupIds([]);
+        } catch (error) {
+            toast({
+                variant: 'destructive',
+                title: "Bulk Assignment Failed",
+                description: "An error occurred during bulk assignment.",
+            });
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
+    const handleSelectAllQuizzes = (checked: boolean) => {
+        setSelectedQuizIds(checked ? filteredQuizzes.map(q => q.id) : []);
+    };
+
+    const handleQuizSelect = (quizId: string, checked: boolean) => {
+        setSelectedQuizIds(prev =>
+            checked ? [...prev, quizId] : prev.filter(id => id !== quizId)
+        );
+    };
+
+    const getGroupsDisplay = (quiz: Quiz) => {
+        const assignedGroups = groups.filter(g => quiz.assignedGroupIds?.includes(g.id));
+        if (assignedGroups.length === 0) return null;
+        
+        const firstGroup = assignedGroups[0];
+        const remainingCount = assignedGroups.length - 1;
+        
+        return {
+            display: remainingCount > 0 ? `${firstGroup.name} +${remainingCount}` : firstGroup.name,
+            allGroups: assignedGroups.map(g => g.name).join(', ')
+        };
+    };
+
     return (
-        <>
+        <TooltipProvider>
             <Card>
                 <CardHeader>
-                    <CardTitle>All Quizzes</CardTitle>
+                    <div className="flex items-center justify-between">
+                        <CardTitle>All Quizzes</CardTitle>
+                        <div className="flex items-center gap-4">
+                            <div className="relative">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                <Input
+                                    placeholder="Search quizzes..."
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                    className="pl-9 w-64"
+                                />
+                            </div>
+                            {selectedQuizIds.length > 0 && (
+                                <Button onClick={() => setIsBulkDialogOpen(true)}>
+                                    <Users className="mr-2 h-4 w-4" />
+                                    Bulk Assign ({selectedQuizIds.length})
+                                </Button>
+                            )}
+                        </div>
+                    </div>
                 </CardHeader>
                 <CardContent>
                     <Table>
                         <TableHeader>
                             <TableRow>
+                                <TableHead className="w-12">
+                                    <Checkbox
+                                        checked={selectedQuizIds.length === filteredQuizzes.length && filteredQuizzes.length > 0}
+                                        onCheckedChange={handleSelectAllQuizzes}
+                                    />
+                                </TableHead>
                                 <TableHead>Title</TableHead>
                                 <TableHead>Category</TableHead>
                                 <TableHead>Questions</TableHead>
+                                <TableHead>Groups</TableHead>
                                 <TableHead>Visibility</TableHead>
                                 <TableHead className="text-right">Actions</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {quizzes.map((quiz) => (
-                                <TableRow key={quiz.id}>
-                                    <TableCell className="font-medium">{quiz.title}</TableCell>
-                                    <TableCell>{quiz.category}</TableCell>
-                                    <TableCell>{quiz.questionIds.length}</TableCell>
-                                    <TableCell>
-                                        <Badge variant={quiz.isPublic ? "default" : "secondary"}>
-                                            {quiz.isPublic ? "Public" : "Private"}
-                                        </Badge>
-                                    </TableCell>
-                                    <TableCell>
-                                        <div className="flex items-center justify-end gap-2">
-                                            <Button variant="outline" size="sm" disabled>
-                                                Edit
-                                            </Button>
-                                            <Button variant="outline" size="sm" onClick={() => handleAssignClick(quiz)}>
-                                                <UserPlus className="mr-2 h-4 w-4" />
-                                                Assign
-                                            </Button>
-                                        </div>
-                                    </TableCell>
-                                </TableRow>
-                            ))}
+                            {filteredQuizzes.map((quiz) => {
+                                const groupsDisplay = getGroupsDisplay(quiz);
+                                return (
+                                    <TableRow key={quiz.id}>
+                                        <TableCell>
+                                            <Checkbox
+                                                checked={selectedQuizIds.includes(quiz.id)}
+                                                onCheckedChange={(checked) => handleQuizSelect(quiz.id, checked as boolean)}
+                                            />
+                                        </TableCell>
+                                        <TableCell className="font-medium">{quiz.title}</TableCell>
+                                        <TableCell>{quiz.category}</TableCell>
+                                        <TableCell>{quiz.questionIds.length}</TableCell>
+                                        <TableCell>
+                                            {groupsDisplay ? (
+                                                <Tooltip>
+                                                    <TooltipTrigger asChild>
+                                                        <Badge variant="outline" className="cursor-help">
+                                                            {groupsDisplay.display}
+                                                        </Badge>
+                                                    </TooltipTrigger>
+                                                    <TooltipContent>
+                                                        <p>{groupsDisplay.allGroups}</p>
+                                                    </TooltipContent>
+                                                </Tooltip>
+                                            ) : (
+                                                <span className="text-muted-foreground text-sm">No groups</span>
+                                            )}
+                                        </TableCell>
+                                        <TableCell>
+                                            <Badge variant={quiz.isPublic ? "default" : "secondary"}>
+                                                {quiz.isPublic ? "Public" : "Private"}
+                                            </Badge>
+                                        </TableCell>
+                                        <TableCell>
+                                            <div className="flex items-center justify-end gap-2">
+                                                <Button variant="outline" size="sm" asChild>
+                                                    <Link href={`/admin/quizzes/${quiz.id}/edit`}>
+                                                        <Edit className="mr-2 h-4 w-4" />
+                                                        Edit
+                                                    </Link>
+                                                </Button>
+                                                <Button variant="outline" size="sm" onClick={() => handleAssignClick(quiz)}>
+                                                    <UserPlus className="mr-2 h-4 w-4" />
+                                                    Assign
+                                                </Button>
+                                            </div>
+                                        </TableCell>
+                                    </TableRow>
+                                );
+                            })}
                         </TableBody>
                     </Table>
                 </CardContent>
@@ -171,6 +316,60 @@ export function AssignQuizClient({ quizzes, candidates }: AssignQuizClientProps)
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
-        </>
+
+            <Dialog open={isBulkDialogOpen} onOpenChange={setIsBulkDialogOpen}>
+                <DialogContent className="sm:max-w-[500px]">
+                    <DialogHeader>
+                        <DialogTitle>Bulk Assign Quizzes</DialogTitle>
+                        <DialogDescription>
+                            Assign {selectedQuizIds.length} selected quizzes to groups.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="py-4">
+                        <div className="mb-4">
+                            <h4 className="text-sm font-medium mb-2">Selected Quizzes ({selectedQuizIds.length}):</h4>
+                            <div className="text-sm text-muted-foreground max-h-20 overflow-y-auto">
+                                {selectedQuizIds.map(id => {
+                                    const quiz = quizzes.find(q => q.id === id);
+                                    return <div key={id}>• {quiz?.title}</div>;
+                                })}
+                            </div>
+                        </div>
+                        <div>
+                            <h4 className="text-sm font-medium mb-2">Assign to Groups:</h4>
+                            <ScrollArea className="h-48 w-full rounded-md border p-4">
+                                {groups.map((group) => (
+                                    <div key={group.id} className="flex items-center space-x-2 mb-2">
+                                        <Checkbox
+                                            checked={selectedGroupIds.includes(group.id)}
+                                            onCheckedChange={(checked) => {
+                                                setSelectedGroupIds(prev =>
+                                                    checked
+                                                        ? [...prev, group.id]
+                                                        : prev.filter(id => id !== group.id)
+                                                );
+                                            }}
+                                        />
+                                        <label className="text-sm font-medium leading-none">
+                                            {group.name} ({group.memberIds?.length || 0} members)
+                                        </label>
+                                    </div>
+                                ))}
+                            </ScrollArea>
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button type="button" variant="secondary" onClick={() => setIsBulkDialogOpen(false)}>Cancel</Button>
+                        <Button
+                            type="submit"
+                            onClick={handleBulkAssign}
+                            disabled={isSubmitting || selectedGroupIds.length === 0}
+                        >
+                            {isSubmitting ? "Assigning..." : `Assign to ${selectedGroupIds.length} Groups`}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+        </TooltipProvider>
     );
 }

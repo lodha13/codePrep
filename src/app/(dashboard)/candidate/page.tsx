@@ -1,16 +1,15 @@
 
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
-import { collection, getDocs, query, where, documentId } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { useEffect, useState } from "react";
 import { Quiz } from "@/types/schema";
-import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 import { CheckSquare, Square } from "lucide-react";
 import { Label } from "@/components/ui/label";
+import { getUserAssignedQuizzes } from "@/lib/admin-utils";
 
 export default function CandidateDashboard() {
     const [quizzes, setQuizzes] = useState<Quiz[]>([]);
@@ -22,38 +21,22 @@ export default function CandidateDashboard() {
             if (!user) {
                 setLoading(false);
                 return;
-            };
-
-            setLoading(true);
-
-            const completedQuizIds = user.completedQuizIds || [];
-            const assignedQuizIds = user.assignedQuizIds || [];
-            
-            const quizIdsToFetch = [...new Set(assignedQuizIds)];
-
-            // 1. Fetch all public quizzes
-            const publicQuizzesQuery = query(collection(db, "quizzes"), where("isPublic", "==", true));
-            const publicQuizzesSnap = await getDocs(publicQuizzesQuery);
-            const publicQuizzes = publicQuizzesSnap.docs.map(d => ({ id: d.id, ...d.data() } as Quiz));
-
-            // 2. Fetch assigned quizzes (if any)
-            let assignedQuizzes: Quiz[] = [];
-            if (assignedQuizIds.length > 0) {
-                 const assignedQuizzesQuery = query(collection(db, "quizzes"), where(documentId(), "in", assignedQuizIds));
-                 const assignedQuizzesSnap = await getDocs(assignedQuizzesQuery);
-                 assignedQuizzes = assignedQuizzesSnap.docs.map(d => ({ id: d.id, ...d.data() } as Quiz));
             }
 
-            // 3. Combine and deduplicate
-            const allVisibleQuizzes = new Map<string, Quiz>();
-            publicQuizzes.forEach(q => allVisibleQuizzes.set(q.id, q));
-            assignedQuizzes.forEach(q => allVisibleQuizzes.set(q.id, q));
-            
-            // 4. Filter out completed quizzes
-            const availableQuizzes = Array.from(allVisibleQuizzes.values()).filter(quiz => !completedQuizIds.includes(quiz.id));
-
-            setQuizzes(availableQuizzes);
-            setLoading(false);
+            setLoading(true);
+            try {
+                const assignedQuizzes = await getUserAssignedQuizzes(user.uid);
+                const completedQuizIds = user.completedQuizIds || [];
+                
+                // Filter out completed quizzes
+                const availableQuizzes = assignedQuizzes.filter(quiz => !completedQuizIds.includes(quiz.id));
+                
+                setQuizzes(availableQuizzes);
+            } catch (error) {
+                console.error('Error fetching quizzes:', error);
+            } finally {
+                setLoading(false);
+            }
         };
 
         if (user) {
@@ -65,8 +48,8 @@ export default function CandidateDashboard() {
     return (
         <div className="p-4 md:p-8 lg:p-12">
              <div className="mb-8">
-                <p className="text-sm text-muted-foreground">Prepare &gt; Java</p>
-                <h1 className="text-4xl font-bold font-headline mt-1">Java</h1>
+                <p className="text-sm text-muted-foreground">Dashboard</p>
+                <h1 className="text-4xl font-bold font-headline mt-1">My Quizzes</h1>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
@@ -121,19 +104,22 @@ export default function CandidateDashboard() {
                             </div>
                         </div>
                          <div>
-                            <h3 className="font-semibold text-sm uppercase text-muted-foreground mb-4">Skills</h3>
+                            <h3 className="font-semibold text-sm uppercase text-muted-foreground mb-4">Progress</h3>
                             <div className="space-y-3">
-                                <div className="flex items-center">
-                                    <Square className="h-4 w-4 text-muted-foreground mr-2" />
-                                    <Label>Java (Basic)</Label>
+                                <div className="flex items-center justify-between">
+                                    <Label>Available Quizzes</Label>
+                                    <span className="text-sm font-medium">{quizzes.length}</span>
                                 </div>
-                                 <div className="flex items-center">
-                                    <Square className="h-4 w-4 text-muted-foreground mr-2" />
-                                    <Label>Java (Intermediate)</Label>
+                                <div className="flex items-center justify-between">
+                                    <Label>Completed</Label>
+                                    <span className="text-sm font-medium">{user?.completedQuizIds?.length || 0}</span>
                                 </div>
-                                 <div className="flex items-center">
-                                    <Square className="h-4 w-4 text-muted-foreground mr-2" />
-                                    <Label>Problem Solving (Intermediate)</Label>
+                                <div className="flex items-center justify-between">
+                                    <Label>Success Rate</Label>
+                                    <span className="text-sm font-medium">
+                                        {user?.completedQuizIds?.length ? 
+                                            Math.round((user.completedQuizIds.length / (user.completedQuizIds.length + quizzes.length)) * 100) : 0}%
+                                    </span>
                                 </div>
                             </div>
                         </div>
