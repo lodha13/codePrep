@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { signInWithEmailAndPassword } from "firebase/auth";
 import { auth } from "@/lib/firebase";
+import { signInWithBounteous } from "@/lib/auth-utils";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,10 +25,20 @@ export default function LoginPage() {
         setLoading(true);
         try {
             await signInWithEmailAndPassword(auth, email, password);
-            // AuthProvider and AuthRedirector will now handle all redirection logic.
-            // No router.push needed here.
         } catch (err: any) {
             setError("Invalid email or password. Please try again.");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleBounteousLogin = async () => {
+        setError("");
+        setLoading(true);
+        try {
+            await signInWithBounteous();
+        } catch (err: any) {
+            setError("Bounteous sign-in failed. Please try again.");
         } finally {
             setLoading(false);
         }
@@ -78,6 +89,20 @@ export default function LoginPage() {
                     <CardFooter className="flex flex-col gap-4">
                         <Button className="w-full" type="submit" disabled={loading}>
                             {loading ? "Signing In..." : "Sign In"}
+                        </Button>
+                        <div className="relative">
+                            <div className="absolute inset-0 flex items-center">
+                                <span className="w-full border-t" />
+                            </div>
+                            <div className="relative flex justify-center text-xs uppercase">
+                                <span className="bg-background px-2 text-muted-foreground">Or continue with</span>
+                            </div>
+                        </div>
+                        <Button variant="outline" className="w-full" onClick={handleBounteousLogin} disabled={loading}>
+                            <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24">
+                                <path fill="currentColor" d="M11.4 24H0V12.6h11.4V24zM24 24H12.6V12.6H24V24zM11.4 11.4H0V0h11.4v11.4zM24 11.4H12.6V0H24v11.4z"/>
+                            </svg>
+                            Continue with Bounteous
                         </Button>
                         <p className="text-sm text-center text-muted-foreground">
                             Don't have an account?{' '}
