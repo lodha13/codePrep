@@ -19,6 +19,8 @@ export const signInWithBounteous = async () => {
             createdAt: new Date(),
             completedQuizIds: [],
             assignedQuizIds: [],
+            groupIds: [],
+            isBench: false,
         };
         await setDoc(doc(db, "users", user.uid), newUser);
     }

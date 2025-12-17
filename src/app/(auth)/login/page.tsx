@@ -32,7 +32,7 @@ export default function LoginPage() {
         }
     };
 
-    const handleBounteousLogin = async () => {
+    const signInWithBounteous = async () => {
         setError("");
         setLoading(true);
         try {

@@ -44,10 +44,12 @@ export default function RegisterPage() {
                 uid: user.uid,
                 email: user.email!,
                 displayName: name,
-                role: "candidate", // Default role
+                role: "candidate",
                 createdAt: new Date(),
-                completedQuizIds: [], // Initialize empty array
-                assignedQuizIds: [], // Initialize empty array
+                completedQuizIds: [],
+                assignedQuizIds: [],
+                groupIds: [],
+                isBench: false,
             };
 
             await setDoc(doc(db, "users", user.uid), newUser);
