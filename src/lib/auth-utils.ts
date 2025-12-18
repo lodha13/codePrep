@@ -26,7 +26,7 @@ export const signInWithBounteous = async () => {
             completedQuizIds: [],
             assignedQuizIds: [],
             groupIds: [],
-            isBench: false,
+            isBench: true,
         };
         await setDoc(doc(db, "users", user.uid), newUser);
     }
