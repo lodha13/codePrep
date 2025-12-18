@@ -10,10 +10,12 @@ export default function Home() {
                     <Code className="h-6 w-6 text-primary" />
                     <span className="sr-only">CodePrep Pro</span>
                 </Link>
-                <nav className="ml-auto flex gap-4 sm:gap-6">
-                    <Link href="/login" className="text-sm font-medium hover:underline underline-offset-4">
-                        Login
-                    </Link>
+                <nav className="ml-auto flex gap-3 items-center">
+                    <Button variant="outline" asChild>
+                        <Link href="/login">
+                            Login
+                        </Link>
+                    </Button>
                     <Button asChild>
                         <Link href="/register">
                             Get Started
@@ -27,10 +29,10 @@ export default function Home() {
                         <div className="grid gap-6 lg:grid-cols-[1fr_400px] lg:gap-12 xl:grid-cols-[1fr_600px]">
                             <div className="flex flex-col justify-center space-y-4">
                                 <div className="space-y-2">
-                                    <h1 className="text-4xl font-bold tracking-tighter sm:text-5xl xl:text-6xl/none font-headline">
+                                    <h1 className="text-4xl font-extrabold tracking-tight sm:text-5xl xl:text-6xl/none font-headline">
                                         The Modern Platform for Coding Assessments
                                     </h1>
-                                    <p className="max-w-[600px] text-muted-foreground md:text-xl">
+                                    <p className="max-w-[600px] text-muted-foreground md:text-xl font-normal leading-relaxed">
                                         CodePrep Pro helps you hire the best talent with realistic coding challenges and AI-powered evaluation.
                                     </p>
                                 </div>
@@ -63,8 +65,8 @@ export default function Home() {
                         <div className="flex flex-col items-center justify-center space-y-4 text-center">
                             <div className="space-y-2">
                                 <div className="inline-block rounded-lg bg-muted px-3 py-1 text-sm">Key Features</div>
-                                <h2 className="text-3xl font-bold tracking-tighter sm:text-5xl font-headline">A better way to assess skills</h2>
-                                <p className="max-w-[900px] text-muted-foreground md:text-xl/relaxed lg:text-base/relaxed xl:text-xl/relaxed">
+                                <h2 className="text-3xl font-bold tracking-tight sm:text-5xl font-headline">A better way to assess skills</h2>
+                                <p className="max-w-[900px] text-muted-foreground md:text-xl/relaxed lg:text-base/relaxed xl:text-xl/relaxed font-normal">
                                     Our platform provides a comprehensive suite of tools to create, administer, and evaluate coding tests.
                                 </p>
                             </div>
