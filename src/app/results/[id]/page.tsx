@@ -25,7 +25,6 @@ export default function ResultPage() {
     const { id } = useParams(); // resultId
     const { user } = useAuth();
     const [result, setResult] = useState<QuizResult | null>(null);
-    const [quiz, setQuiz] = useState<Quiz | null>(null);
     const [questions, setQuestions] = useState<Record<string, Question>>({});
     const [loading, setLoading] = useState(true);
 
@@ -37,20 +36,20 @@ export default function ResultPage() {
             const resultRef = doc(db, "results", id as string);
             const resultSnap = await getDoc(resultRef);
 
-            if (!resultSnap.exists() || resultSnap.data().userId !== user.uid) {
+            if (!resultSnap.exists()) {
                 setLoading(false);
-                return; // Or show unauthorized
+                return;
             }
 
             const resultData = { id: resultSnap.id, ...resultSnap.data() } as QuizResult;
-            setResult(resultData);
-
-            // Fetch quiz details
-            const quizRef = doc(db, "quizzes", resultData.quizId);
-            const quizSnap = await getDoc(quizRef);
-            if (quizSnap.exists()) {
-                setQuiz({ id: quizSnap.id, ...quizSnap.data() } as Quiz);
+            
+            // Allow admins to view any result, candidates can only view their own
+            if (user.role !== 'admin' && resultData.userId !== user.uid) {
+                setLoading(false);
+                return;
             }
+            
+            setResult(resultData);
 
             // Fetch question details
             const questionIds = Object.keys(resultData.answers);
@@ -169,7 +168,7 @@ export default function ResultPage() {
                     <ChevronRight className="h-4 w-4 mx-1" />
                     <span>Result</span>
                  </div>
-                <h1 className="text-4xl font-bold font-headline mt-1">{quiz?.title || 'Quiz'}</h1>
+                <h1 className="text-4xl font-bold font-headline mt-1">{result?.quizTitle || 'Quiz'}</h1>
             </header>
             <Card className="shadow-lg">
                 <CardHeader className="text-center">
