@@ -55,6 +55,7 @@ export function UserManagementClient({ initialUsers }: UserManagementClientProps
     const [allQuizzes, setAllQuizzes] = useState<any[]>([]);
     const [userQuizStats, setUserQuizStats] = useState<any>(null);
     const [groups, setGroups] = useState<Group[]>([]);
+    const [showBenchOnly, setShowBenchOnly] = useState(true);
     const { toast } = useToast();
 
     useEffect(() => {
@@ -70,12 +71,19 @@ export function UserManagementClient({ initialUsers }: UserManagementClientProps
     }, []);
 
     useEffect(() => {
-        const filtered = users.filter(user => 
-            user.displayName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            user.email.toLowerCase().includes(searchTerm.toLowerCase())
+        let filtered = users.filter(user => 
+            user.role === 'candidate' && // Only show candidates
+            (user.displayName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            user.email.toLowerCase().includes(searchTerm.toLowerCase()))
         );
+        
+        // Filter by bench status if enabled
+        if (showBenchOnly) {
+            filtered = filtered.filter(user => user.isBench === true);
+        }
+        
         setFilteredUsers(filtered);
-    }, [users, searchTerm]);
+    }, [users, searchTerm, showBenchOnly]);
 
     const handleRoleChange = async (uid: string, newRole: UserRole) => {
         setLoading(prev => ({ ...prev, [uid]: true }));
@@ -186,14 +194,25 @@ export function UserManagementClient({ initialUsers }: UserManagementClientProps
             {/* Search Bar */}
             <Card>
                 <CardContent className="pt-6">
-                    <div className="relative">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                        <Input
-                            placeholder="Search users by name or email..."
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            className="pl-9"
-                        />
+                    <div className="flex items-center gap-4">
+                        <div className="relative flex-1">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                            <Input
+                                placeholder="Search users by name or email..."
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                className="pl-9"
+                            />
+                        </div>
+                        <label className="flex items-center gap-2">
+                            <input
+                                type="checkbox"
+                                checked={showBenchOnly}
+                                onChange={(e) => setShowBenchOnly(e.target.checked)}
+                                className="rounded"
+                            />
+                            <span className="text-sm">Show only bench users</span>
+                        </label>
                     </div>
                 </CardContent>
             </Card>
@@ -204,12 +223,11 @@ export function UserManagementClient({ initialUsers }: UserManagementClientProps
                     <Table>
                         <TableHeader>
                             <TableRow>
-                                <TableHead>Name</TableHead>
-                                <TableHead>Email</TableHead>
-                                <TableHead>Bench Status</TableHead>
-                                <TableHead>Groups</TableHead>
-                                <TableHead className="w-[180px]">Role</TableHead>
-                                <TableHead className="w-[100px]">Actions</TableHead>
+                                <TableHead className="w-[200px]">Name</TableHead>
+                                <TableHead className="w-[250px]">Email</TableHead>
+                                <TableHead className="w-[120px]">Groups</TableHead>
+                                <TableHead className="w-[120px]">Role</TableHead>
+                                <TableHead className="w-[120px]">Actions</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -217,12 +235,6 @@ export function UserManagementClient({ initialUsers }: UserManagementClientProps
                                 <TableRow key={user.uid}>
                                     <TableCell className="font-medium">{user.displayName || 'N/A'}</TableCell>
                                     <TableCell>{user.email}</TableCell>
-                                    <TableCell>
-                                        <Switch
-                                            checked={user.isBench || false}
-                                            onCheckedChange={(checked) => handleBenchStatusChange(user.uid, checked)}
-                                        />
-                                    </TableCell>
                                     <TableCell>
                                         <Badge variant="outline">
                                             {user.groupIds?.length || 0} groups
