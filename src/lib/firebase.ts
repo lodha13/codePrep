@@ -25,6 +25,7 @@ if (!getApps().length) {
 }
 
 const auth = getAuth(app);
+auth.tenantId = "9d343c00-4814-47eb-abcd-e3a0761d628b";
 const db = getFirestore(app);
 
 // Helper function to get or create a unique quiz session
