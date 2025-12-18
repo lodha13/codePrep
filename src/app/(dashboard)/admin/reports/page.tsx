@@ -34,7 +34,7 @@ interface User {
     role: string;
     assignedQuizIds?: string[];
     completedQuizIds?: string[];
-    onBench?: boolean;
+    isBench?: boolean;
     createdAt?: any;
     primarySkill?: string;
 }
@@ -164,9 +164,9 @@ export default function ReportsPage() {
     const generateIncompleteReport = () => {
         let candidates = users.filter(user => user.role === "candidate");
         
-        // Filter by onBench status if enabled
+        // Filter by isBench status if enabled
         if (showOnBenchOnly) {
-            candidates = candidates.filter(user => user.onBench === true);
+            candidates = candidates.filter(user => user.isBench === true);
         }
         
         // Filter by name
@@ -269,10 +269,10 @@ export default function ReportsPage() {
     };
 
     const generateRankings = () => {
-        // Filter users first (onBench = true)
+        // Filter users first (isBench = true)
         let eligibleUsers = users.filter(user => 
             user.role === "candidate" && 
-            user.onBench === true
+            user.isBench === true
         );
         
         const eligibleUserIds = eligibleUsers.map(u => u.id);
