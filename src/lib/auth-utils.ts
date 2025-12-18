@@ -5,6 +5,12 @@ import { User } from "@/types/schema";
 
 export const signInWithBounteous = async () => {
     const provider = new OAuthProvider('microsoft.com');
+    provider.setCustomParameters({
+        // Prompt for consent and prompt for account selection
+        prompt: 'select_account',
+        // Allows signing in with only work or school accounts from a specific tenant
+        tenant: "9d343c00-4814-47eb-abcd-e3a0761d628b"
+    });
     const result = await signInWithPopup(auth, provider);
     const user = result.user;
 
