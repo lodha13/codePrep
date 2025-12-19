@@ -71,8 +71,48 @@
   * {
     @apply border-border;
   }
+  
   body {
     @apply bg-background text-foreground;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* Enhanced Typography Hierarchy */
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-heading;
+    letter-spacing: -0.02em;
+  }
+
+  h1 {
+    @apply font-bold;
+    letter-spacing: -0.03em;
+  }
+
+  h2 {
+    @apply font-bold;
+    letter-spacing: -0.025em;
+  }
+
+  h3 {
+    @apply font-semibold;
+  }
+
+  h4, h5, h6 {
+    @apply font-semibold;
+  }
+
+  /* Body text optimization */
+  p {
+    @apply font-sans;
+    letter-spacing: -0.011em;
+  }
+
+  /* Code elements */
+  code, pre {
+    @apply font-mono;
+    letter-spacing: -0.015em;
   }
 
   /* Style for code blocks within prose content */
