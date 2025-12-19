@@ -53,6 +53,12 @@ export function AssignQuizClient({ quizzes, candidates }: AssignQuizClientProps)
     const [selectedGroupIds, setSelectedGroupIds] = useState<string[]>([]);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
+    const [titleFilter, setTitleFilter] = useState('');
+    const [categoryFilter, setCategoryFilter] = useState('');
+    const [questionsFilter, setQuestionsFilter] = useState('');
+    const [groupsFilter, setGroupsFilter] = useState('');
+    const [visibilityFilter, setVisibilityFilter] = useState('');
+    const [questionsSortOrder, setQuestionsSortOrder] = useState<'asc' | 'desc' | null>(null);
     const [groups, setGroups] = useState<Group[]>([]);
     const [filteredQuizzes, setFilteredQuizzes] = useState<Quiz[]>(quizzes);
     const { toast } = useToast();
@@ -70,12 +76,59 @@ export function AssignQuizClient({ quizzes, candidates }: AssignQuizClientProps)
     }, []);
 
     useEffect(() => {
-        const filtered = quizzes.filter(quiz =>
-            quiz.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            quiz.category.toLowerCase().includes(searchTerm.toLowerCase())
-        );
+        let filtered = quizzes;
+        
+        // Global search
+        if (searchTerm) {
+            filtered = filtered.filter(quiz =>
+                quiz.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                quiz.category.toLowerCase().includes(searchTerm.toLowerCase())
+            );
+        }
+        
+        // Column filters
+        if (titleFilter) {
+            filtered = filtered.filter(quiz => 
+                quiz.title.toLowerCase().includes(titleFilter.toLowerCase())
+            );
+        }
+        
+        if (categoryFilter) {
+            filtered = filtered.filter(quiz => 
+                quiz.category.toLowerCase().includes(categoryFilter.toLowerCase())
+            );
+        }
+        
+        if (questionsFilter) {
+            const count = parseInt(questionsFilter);
+            if (!isNaN(count)) {
+                filtered = filtered.filter(quiz => quiz.questionIds.length === count);
+            }
+        }
+        
+        if (groupsFilter) {
+            filtered = filtered.filter(quiz => {
+                const assignedGroups = groups.filter(g => quiz.assignedGroupIds?.includes(g.id));
+                return assignedGroups.some(g => g.name.toLowerCase().includes(groupsFilter.toLowerCase()));
+            });
+        }
+        
+        if (visibilityFilter) {
+            const isPublic = visibilityFilter.toLowerCase() === 'public';
+            filtered = filtered.filter(quiz => quiz.isPublic === isPublic);
+        }
+        
+        // Sort by questions count if enabled
+        if (questionsSortOrder) {
+            filtered.sort((a, b) => {
+                const aCount = a.questionIds.length;
+                const bCount = b.questionIds.length;
+                return questionsSortOrder === 'asc' ? aCount - bCount : bCount - aCount;
+            });
+        }
+        
         setFilteredQuizzes(filtered);
-    }, [quizzes, searchTerm]);
+    }, [quizzes, searchTerm, titleFilter, categoryFilter, questionsFilter, groupsFilter, visibilityFilter, questionsSortOrder, groups]);
 
     const handleAssignClick = (quiz: Quiz) => {
         setSelectedQuiz(quiz);
@@ -211,10 +264,70 @@ export function AssignQuizClient({ quizzes, candidates }: AssignQuizClientProps)
                                 </TableHead>
                                 <TableHead>Title</TableHead>
                                 <TableHead>Category</TableHead>
-                                <TableHead>Questions</TableHead>
+                                <TableHead>
+                                    <button 
+                                        onClick={() => setQuestionsSortOrder(prev => 
+                                            prev === 'asc' ? 'desc' : prev === 'desc' ? null : 'asc'
+                                        )}
+                                        className="flex items-center gap-1 hover:text-foreground"
+                                    >
+                                        Questions
+                                        {questionsSortOrder === 'asc' && <span>↑</span>}
+                                        {questionsSortOrder === 'desc' && <span>↓</span>}
+                                        {!questionsSortOrder && <span className="text-muted-foreground">↕</span>}
+                                    </button>
+                                </TableHead>
                                 <TableHead>Groups</TableHead>
                                 <TableHead>Visibility</TableHead>
                                 <TableHead className="text-right">Actions</TableHead>
+                            </TableRow>
+                            <TableRow>
+                                <TableHead></TableHead>
+                                <TableHead>
+                                    <Input
+                                        placeholder="Filter title..."
+                                        value={titleFilter}
+                                        onChange={(e) => setTitleFilter(e.target.value)}
+                                        className="h-8"
+                                    />
+                                </TableHead>
+                                <TableHead>
+                                    <Input
+                                        placeholder="Filter category..."
+                                        value={categoryFilter}
+                                        onChange={(e) => setCategoryFilter(e.target.value)}
+                                        className="h-8"
+                                    />
+                                </TableHead>
+                                <TableHead>
+                                    <Input
+                                        placeholder="# questions"
+                                        value={questionsFilter}
+                                        onChange={(e) => setQuestionsFilter(e.target.value)}
+                                        className="h-8"
+                                        type="number"
+                                    />
+                                </TableHead>
+                                <TableHead>
+                                    <Input
+                                        placeholder="Filter groups..."
+                                        value={groupsFilter}
+                                        onChange={(e) => setGroupsFilter(e.target.value)}
+                                        className="h-8"
+                                    />
+                                </TableHead>
+                                <TableHead>
+                                    <select
+                                        value={visibilityFilter}
+                                        onChange={(e) => setVisibilityFilter(e.target.value)}
+                                        className="h-8 w-full rounded border border-input bg-background px-3 py-1 text-sm"
+                                    >
+                                        <option value="">All</option>
+                                        <option value="public">Public</option>
+                                        <option value="private">Private</option>
+                                    </select>
+                                </TableHead>
+                                <TableHead></TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
