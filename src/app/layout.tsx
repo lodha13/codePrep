@@ -1,14 +1,31 @@
 
 import type { Metadata } from "next";
-import { Inter, Space_Grotesk, Source_Code_Pro } from "next/font/google";
+import { Inter, Outfit, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/context/AuthContext";
 import { Toaster } from "@/components/ui/toaster";
 import { cn } from "@/lib/utils";
 
-const fontSans = Inter({ subsets: ["latin"], variable: "--font-sans" });
-const fontHeading = Space_Grotesk({ subsets: ["latin"], variable: "--font-heading" });
-const fontMono = Source_Code_Pro({ subsets: ["latin"], variable: "--font-mono" });
+const fontSans = Inter({
+    subsets: ["latin"],
+    variable: "--font-sans",
+    weight: ["400", "500", "600", "700"],
+    display: "swap",
+});
+
+const fontHeading = Outfit({
+    subsets: ["latin"],
+    variable: "--font-heading",
+    weight: ["400", "500", "600", "700", "800"],
+    display: "swap",
+});
+
+const fontMono = JetBrains_Mono({
+    subsets: ["latin"],
+    variable: "--font-mono",
+    weight: ["400", "500", "600"],
+    display: "swap",
+});
 
 export const metadata: Metadata = {
     title: "CodePrep Pro",
