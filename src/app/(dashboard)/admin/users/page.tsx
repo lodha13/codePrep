@@ -1,6 +1,10 @@
 import { getUsers } from '../actions';
 import { UserManagementClient } from './UserManagementClient';
 
+// Force dynamic rendering to prevent caching issues
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 export default async function UserManagementPage() {
     const users = await getUsers();
 
