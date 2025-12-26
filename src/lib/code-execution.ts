@@ -1,6 +1,7 @@
 
 import { CodingQuestion, TestCase } from "@/types/schema";
 import { Buffer } from "buffer";
+import { getLanguageId } from "./language-utils";
 
 export interface TestCaseResult {
   input: string;
@@ -22,13 +23,6 @@ export interface ExecutionResult {
   total_tests?: number;
 }
 
-const LANGUAGE_ID_MAP: Record<CodingQuestion["language"], number> = {
-  java: 91,
-  javascript: 93,
-  python: 92,
-  cpp: 54,
-};
-
 const judge0Endpoint = 'https://ce.judge0.com/submissions?base64_encoded=true&wait=true';
 
 const decode = (str: string | undefined | null): string => {
@@ -42,11 +36,11 @@ const decode = (str: string | undefined | null): string => {
 
 export async function executeCode(
   source_code: string,
-  language: CodingQuestion["language"],
+  language: string,
   testCases: TestCase[]
 ): Promise<ExecutionResult> {
-  const language_id = LANGUAGE_ID_MAP[language];
-  if (!language_id) throw new Error(`Unsupported language: ${language}`);
+  const language_id = await getLanguageId(language);
+  if (!language_id) throw new Error(`Unsupported or invalid language: ${language}`);
 
   const encodedSource = Buffer.from(source_code).toString("base64");
 

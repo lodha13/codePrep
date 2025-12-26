@@ -33,6 +33,7 @@ import {
     TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Trash2 } from 'lucide-react';
 import { assignQuizToUsers } from '../actions';
 import { useToast } from '@/components/ui/use-toast';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -47,6 +48,7 @@ interface AssignQuizClientProps {
 export function AssignQuizClient({ quizzes, candidates }: AssignQuizClientProps) {
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [isBulkDialogOpen, setIsBulkDialogOpen] = useState(false);
+    const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
     const [selectedQuiz, setSelectedQuiz] = useState<Quiz | null>(null);
     const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
     const [selectedQuizIds, setSelectedQuizIds] = useState<string[]>([]);
@@ -136,6 +138,11 @@ export function AssignQuizClient({ quizzes, candidates }: AssignQuizClientProps)
         setSelectedUserIds([]); // Reset selections
     };
 
+    const handleDeleteClick = (quiz: Quiz) => {
+        setSelectedQuiz(quiz);
+        setIsDeleteDialogOpen(true);
+    };
+
     const handleUserToggle = (userId: string) => {
         setSelectedUserIds(prev =>
             prev.includes(userId) ? prev.filter(id => id !== userId) : [...prev, userId]
@@ -169,6 +176,42 @@ export function AssignQuizClient({ quizzes, candidates }: AssignQuizClientProps)
             });
         }
         setIsSubmitting(false);
+    };
+
+    const handleDeleteConfirm = async () => {
+        if (!selectedQuiz) return;
+
+        setIsSubmitting(true);
+        try {
+            const response = await fetch(`/api/quizzes/${selectedQuiz.id}`, {
+                method: 'DELETE',
+            });
+
+            if (response.ok) {
+                toast({
+                    title: 'Quiz Deleted',
+                    description: `Successfully deleted "${selectedQuiz.title}".`,
+                });
+                // Refresh the list of quizzes
+                setFilteredQuizzes(filteredQuizzes.filter(q => q.id !== selectedQuiz.id));
+            } else {
+                const data = await response.json();
+                toast({
+                    variant: 'destructive',
+                    title: 'Deletion Failed',
+                    description: data.message || 'An unknown error occurred.',
+                });
+            }
+        } catch (error) {
+            toast({
+                variant: 'destructive',
+                title: 'Deletion Failed',
+                description: 'A network error occurred.',
+            });
+        } finally {
+            setIsSubmitting(false);
+            setIsDeleteDialogOpen(false);
+        }
     };
 
     const handleBulkAssign = async () => {
@@ -370,12 +413,13 @@ export function AssignQuizClient({ quizzes, candidates }: AssignQuizClientProps)
                                                 <Button variant="outline" size="sm" asChild>
                                                     <Link href={`/admin/quizzes/${quiz.id}/edit`}>
                                                         <Edit className="mr-2 h-4 w-4" />
-                                                        Edit
                                                     </Link>
                                                 </Button>
                                                 <Button variant="outline" size="sm" onClick={() => handleAssignClick(quiz)}>
                                                     <UserPlus className="mr-2 h-4 w-4" />
-                                                    Assign
+                                                </Button>
+                                                <Button variant="destructive" size="sm" onClick={() => handleDeleteClick(quiz)}>
+                                                    <Trash2 className="mr-2 h-4 w-4" />
                                                 </Button>
                                             </div>
                                         </TableCell>
@@ -479,6 +523,23 @@ export function AssignQuizClient({ quizzes, candidates }: AssignQuizClientProps)
                             disabled={isSubmitting || selectedGroupIds.length === 0}
                         >
                             {isSubmitting ? "Assigning..." : `Assign to ${selectedGroupIds.length} Groups`}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Are you sure you want to delete this quiz?</DialogTitle>
+                        <DialogDescription>
+                            This will permanently delete the quiz "{selectedQuiz?.title}" and all of its associated questions. This action cannot be undone.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter>
+                        <Button variant="ghost" onClick={() => setIsDeleteDialogOpen(false)}>Cancel</Button>
+                        <Button variant="destructive" onClick={handleDeleteConfirm} disabled={isSubmitting}>
+                            {isSubmitting ? "Deleting..." : "Delete"}
                         </Button>
                     </DialogFooter>
                 </DialogContent>

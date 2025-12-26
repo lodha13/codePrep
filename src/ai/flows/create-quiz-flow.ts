@@ -20,7 +20,7 @@ const QuestionSchema = z.object({
   mark: z.number().describe("The points awarded for a correct answer."),
   options: z.array(z.string()).optional().describe("Array of 4 options for MCQ questions."),
   correctOptionIndex: z.number().optional().describe("The 0-based index of the correct option for MCQ."),
-  language: z.enum(['javascript', 'python', 'java', 'cpp']).optional().describe("Programming language for coding questions."),
+  language: z.string().optional().describe("Programming language for coding questions."),
   starterCode: z.string().optional().describe("Boilerplate code for coding questions."),
   testCases: z.array(TestCaseSchema).optional().describe("Test cases for coding questions."),
 });
@@ -36,7 +36,7 @@ const QuizDataSchema = z.object({
 const QuizGenerationInputSchema = z.object({
   category: z.string().describe("Main skill category (e.g., Programming, DevOps, Database)"),
   subCategory: z.string().optional().describe("Sub-category for more specific focus"),
-  language: z.enum(['javascript', 'python', 'java', 'cpp']).optional().describe("Programming language for coding questions"),
+  language: z.string().optional().describe("Programming language for coding questions"),
   customPrompt: z.string().optional().describe("Additional context or specific requirements"),
   complexity: z.enum(['easy', 'medium', 'hard']),
   numberOfQuestions: z.number().int(),
@@ -99,6 +99,7 @@ ${questionTypeInstructions}
     "durationMinutes": number,
     "category": "string",
     "difficulty": "easy" | "medium" | "hard"
+    "language": "${input.language}",
   },
   "questions": [
     {
@@ -107,11 +108,11 @@ ${questionTypeInstructions}
       "type": "mcq" | "coding",
       "difficulty": "easy" | "medium" | "hard",
       "mark": number,
+      "language": "${input.language}",
       // For MCQ questions:
       "options": ["string", "string", "string", "string"],
       "correctOptionIndex": number,
       // For Coding questions:
-      "language": "${input.language || 'javascript'}" | "python" | "java" | "cpp",
       "starterCode": "string",
       "testCases": [
         {

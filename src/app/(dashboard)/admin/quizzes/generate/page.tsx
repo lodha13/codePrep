@@ -13,6 +13,8 @@ import { generateQuizAction, seedQuizAction, uploadQuizJsonAction } from "./acti
 import { useToast } from "@/components/ui/use-toast";
 import Link from "next/link";
 import { ArrowLeft, Wand2, DatabaseZap, Upload } from "lucide-react";
+import { getLanguages } from "@/lib/language-utils";
+import { Language } from "@/types/schema";
 import { Separator } from "@/components/ui/separator";
 
 const initialState = {
@@ -59,6 +61,7 @@ function SeedButton() {
 
 export default function GenerateQuizPage() {
     const [jsonContent, setJsonContent] = useState("");
+    const [languages, setLanguages] = useState<Language[]>([]);
     const [generateState, generateFormAction] = useActionState(generateQuizAction, initialState);
     const [uploadState, uploadFormAction] = useActionState(uploadQuizJsonAction, uploadInitialState);
     const [seedState, seedFormAction] = useActionState(async (previousState: any, formData: FormData) => {
@@ -67,6 +70,14 @@ export default function GenerateQuizPage() {
     }, initialState);
 
     const { toast } = useToast();
+
+    useEffect(() => {
+        async function loadLanguages() {
+            const fetchedLanguages = await getLanguages();
+            setLanguages(fetchedLanguages);
+        }
+        loadLanguages();
+    }, []);
 
     useEffect(() => {
         if (generateState.message) {
@@ -204,10 +215,11 @@ export default function GenerateQuizPage() {
                                     <SelectValue placeholder="Select language" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="javascript">JavaScript</SelectItem>
-                                    <SelectItem value="python">Python</SelectItem>
-                                    <SelectItem value="java">Java</SelectItem>
-                                    <SelectItem value="cpp">C++</SelectItem>
+                                    {languages.map((lang) => (
+                                        <SelectItem key={lang.id} value={lang.id}>
+                                            {lang.name}
+                                        </SelectItem>
+                                    ))}
                                 </SelectContent>
                             </Select>
                         </div>
