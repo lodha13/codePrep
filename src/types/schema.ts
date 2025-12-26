@@ -72,7 +72,7 @@ export interface TestCase {
 
 export interface CodingQuestion extends BaseQuestion {
     type: "coding";
-    language: "javascript" | "python" | "java" | "cpp";
+    language: string;
     starterCode: string;
     testCases: TestCase[];
     solutionCode?: string; // For reference/grading
@@ -96,6 +96,13 @@ export interface QuestionResult {
     total: number; // The maximum possible score for this question.
     userAnswer?: string; // Index for MCQ, Code for Coding
     testCaseResults?: TestCaseResult[]; // For coding questions
+}
+
+export interface Language {
+    id: string;
+    name: string;
+    judge0Id: number;
+    boilerplate: string;
 }
 
 export interface QuizResult {

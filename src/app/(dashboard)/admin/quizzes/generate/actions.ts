@@ -15,7 +15,7 @@ const UploadQuizSchema = z.object({
 const GenerateQuizSchema = z.object({
   category: z.string().min(3, { message: "Category must be at least 3 characters." }),
   subCategory: z.string().optional(),
-  language: z.enum(['javascript', 'python', 'java', 'cpp']).optional(),
+  language: z.string().optional(),
   customPrompt: z.string().optional(),
   complexity: z.enum(['easy', 'medium', 'hard']),
   numberOfQuestions: z.coerce.number().int().min(1).max(30),
