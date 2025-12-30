@@ -181,7 +181,7 @@ export default function CodingView({ question, onCodeChange, currentCode }: Codi
                                 <TabsTrigger value="testcases" className="text-xs rounded-none data-[state=active]:bg-background">Test Cases</TabsTrigger>
                                 <TabsTrigger value="output" className="text-xs rounded-none data-[state=active]:bg-background">Output</TabsTrigger>
                             </TabsList>
-                            <TabsContent value="testcases" className="flex-grow mt-0 overflow-y-auto">
+                            <TabsContent value="testcases" className="flex-grow mt-0">
                                <ScrollArea className="h-full p-4">
                                     {question.testCases.filter(tc => !tc.isHidden).map((tc, i) => (
                                         <Card key={i} className="mb-2 bg-muted p-3 font-mono text-sm">
@@ -193,7 +193,7 @@ export default function CodingView({ question, onCodeChange, currentCode }: Codi
                                     ))}
                                </ScrollArea>
                             </TabsContent>
-                            <TabsContent value="output" className="flex-grow mt-0 overflow-y-auto">
+                            <TabsContent value="output" className="flex-grow mt-0">
                                <ScrollArea className="h-full p-4">
                                     <div className="text-sm font-mono whitespace-pre-wrap">
                                         {renderOutput()}
