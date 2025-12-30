@@ -38,6 +38,7 @@ import { Search, Eye, Trophy, Calendar, AlertTriangle, Edit } from 'lucide-react
 import Link from 'next/link';
 import { db } from '@/lib/firebase';
 import { collection, query, where, getDocs } from 'firebase/firestore';
+import Pagination from '@/components/ui/pagination';
 
 
 interface UserManagementClientProps {
@@ -56,6 +57,8 @@ export function UserManagementClient({ initialUsers }: UserManagementClientProps
     const [userQuizStats, setUserQuizStats] = useState<any>(null);
     const [groups, setGroups] = useState<Group[]>([]);
     const [showBenchOnly, setShowBenchOnly] = useState(true);
+    const [page, setPage] = useState(1);
+    const [pageSize, setPageSize] = useState(10);
     const { toast } = useToast();
 
     useEffect(() => {
@@ -72,17 +75,16 @@ export function UserManagementClient({ initialUsers }: UserManagementClientProps
 
     useEffect(() => {
         let filtered = users.filter(user => 
-            user.role === 'candidate' && // Only show candidates
             (user.displayName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
             user.email.toLowerCase().includes(searchTerm.toLowerCase()))
         );
         
-        // Filter by bench status if enabled
         if (showBenchOnly) {
             filtered = filtered.filter(user => user.isBench === true);
         }
         
         setFilteredUsers(filtered);
+        setPage(1);
     }, [users, searchTerm, showBenchOnly]);
 
     const handleRoleChange = async (uid: string, newRole: UserRole) => {
@@ -220,6 +222,13 @@ export function UserManagementClient({ initialUsers }: UserManagementClientProps
             {/* Users Table */}
             <Card>
                 <CardContent className="pt-6">
+                    <Pagination
+                        total={filteredUsers.length}
+                        page={page}
+                        pageSize={pageSize}
+                        onPageChange={(p) => setPage(Math.max(1, Math.min(Math.ceil(filteredUsers.length / pageSize) || 1, p)))}
+                        onPageSizeChange={(s) => { setPageSize(s); setPage(1); }}
+                    />
                     <Table>
                         <TableHeader>
                             <TableRow>
@@ -231,7 +240,7 @@ export function UserManagementClient({ initialUsers }: UserManagementClientProps
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {filteredUsers.map((user) => (
+                            {filteredUsers.slice((page - 1) * pageSize, page * pageSize).map((user) => (
                                 <TableRow key={user.uid}>
                                     <TableCell className="font-medium">{user.displayName || 'N/A'}</TableCell>
                                     <TableCell>{user.email}</TableCell>

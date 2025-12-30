@@ -26,6 +26,7 @@ import {
 import { Users, Trophy, AlertTriangle, Eye, Search, Calendar } from "lucide-react";
 import Link from "next/link";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import Pagination from '@/components/ui/pagination';
 
 interface User {
     id: string;
@@ -78,6 +79,10 @@ export default function ReportsPage() {
     const [sortOrder, setSortOrder] = useState<string>("desc");
     const [assignmentSortBy, setAssignmentSortBy] = useState<string>("avgScore");
     const [assignmentSortOrder, setAssignmentSortOrder] = useState<string>("desc");
+    const [assignmentsPage, setAssignmentsPage] = useState(1);
+    const [assignmentsPageSize, setAssignmentsPageSize] = useState(10);
+    const [rankingsPage, setRankingsPage] = useState(1);
+    const [rankingsPageSize, setRankingsPageSize] = useState(10);
 
     useEffect(() => {
         fetchData();
@@ -266,6 +271,7 @@ export default function ReportsPage() {
         });
 
         setIncompleteUsers(incomplete);
+        setAssignmentsPage(1);
     };
 
     const generateRankings = () => {
@@ -363,6 +369,7 @@ export default function ReportsPage() {
 
         // Limit to top 50
         setRankings(rankingsArray.slice(0, 50));
+        setRankingsPage(1);
     };
 
     if (loading) {
@@ -400,6 +407,13 @@ export default function ReportsPage() {
                     </div>
                 </CardHeader>
                 <CardContent>
+                    <Pagination
+                        total={incompleteUsers.length}
+                        page={assignmentsPage}
+                        pageSize={assignmentsPageSize}
+                        onPageChange={(p) => setAssignmentsPage(Math.max(1, Math.min(Math.ceil(incompleteUsers.length / assignmentsPageSize) || 1, p)))}
+                        onPageSizeChange={(s) => { setAssignmentsPageSize(s); setAssignmentsPage(1); }}
+                    />
                     <Table>
                         <TableHeader>
                             <TableRow>
@@ -537,7 +551,7 @@ export default function ReportsPage() {
                                     </TableCell>
                                 </TableRow>
                             ) : (
-                                incompleteUsers.map(userData => (
+                                incompleteUsers.slice((assignmentsPage - 1) * assignmentsPageSize, assignmentsPage * assignmentsPageSize).map(userData => (
                                     <TableRow key={userData.userId}>
                                         <TableCell>
                                             <div>
@@ -708,6 +722,7 @@ export default function ReportsPage() {
                             )}
                         </TableBody>
                     </Table>
+                    </Table>
                     </CardContent>
                 </Card>
                 </TabsContent>
@@ -738,6 +753,13 @@ export default function ReportsPage() {
                     </div>
                 </CardHeader>
                 <CardContent>
+                    <Pagination
+                        total={rankings.length}
+                        page={rankingsPage}
+                        pageSize={rankingsPageSize}
+                        onPageChange={(p) => setRankingsPage(Math.max(1, Math.min(Math.ceil(rankings.length / rankingsPageSize) || 1, p)))}
+                        onPageSizeChange={(s) => { setRankingsPageSize(s); setRankingsPage(1); }}
+                    />
                     <Table>
                         <TableHeader>
                             <TableRow>
@@ -833,11 +855,11 @@ export default function ReportsPage() {
                                     </TableCell>
                                 </TableRow>
                             ) : (
-                                rankings.map((user, index) => (
+                                rankings.slice((rankingsPage - 1) * rankingsPageSize, rankingsPage * rankingsPageSize).map((user, index) => (
                                     <TableRow key={user.userId}>
                                         <TableCell>
                                             <div className="w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-bold">
-                                                {index + 1}
+                                                {index + 1 + (rankingsPage - 1) * rankingsPageSize}
                                             </div>
                                         </TableCell>
                                         <TableCell>
@@ -996,6 +1018,7 @@ export default function ReportsPage() {
                                 ))
                             )}
                         </TableBody>
+                    </Table>
                     </Table>
                     </CardContent>
                 </Card>

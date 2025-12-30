@@ -11,6 +11,7 @@ import {
     TableHeader,
     TableRow,
 } from "@/components/ui/table";
+import Pagination from '@/components/ui/pagination';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -63,6 +64,8 @@ export function AssignQuizClient({ quizzes, candidates }: AssignQuizClientProps)
     const [questionsSortOrder, setQuestionsSortOrder] = useState<'asc' | 'desc' | null>(null);
     const [groups, setGroups] = useState<Group[]>([]);
     const [filteredQuizzes, setFilteredQuizzes] = useState<Quiz[]>(quizzes);
+    const [page, setPage] = useState(1);
+    const [pageSize, setPageSize] = useState(10);
     const { toast } = useToast();
 
     useEffect(() => {
@@ -130,6 +133,7 @@ export function AssignQuizClient({ quizzes, candidates }: AssignQuizClientProps)
         }
         
         setFilteredQuizzes(filtered);
+        setPage(1);
     }, [quizzes, searchTerm, titleFilter, categoryFilter, questionsFilter, groupsFilter, visibilityFilter, questionsSortOrder, groups]);
 
     const handleAssignClick = (quiz: Quiz) => {
@@ -296,6 +300,13 @@ export function AssignQuizClient({ quizzes, candidates }: AssignQuizClientProps)
                     </div>
                 </CardHeader>
                 <CardContent>
+                    <Pagination
+                        total={filteredQuizzes.length}
+                        page={page}
+                        pageSize={pageSize}
+                        onPageChange={(p) => setPage(Math.max(1, Math.min(Math.ceil(filteredQuizzes.length / pageSize) || 1, p)))}
+                        onPageSizeChange={(s) => { setPageSize(s); setPage(1); }}
+                    />
                     <Table>
                         <TableHeader>
                             <TableRow>
@@ -374,7 +385,7 @@ export function AssignQuizClient({ quizzes, candidates }: AssignQuizClientProps)
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {filteredQuizzes.map((quiz) => {
+                            {filteredQuizzes.slice((page - 1) * pageSize, page * pageSize).map((quiz) => {
                                 const groupsDisplay = getGroupsDisplay(quiz);
                                 return (
                                     <TableRow key={quiz.id}>
