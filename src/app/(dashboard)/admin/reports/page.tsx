@@ -1018,7 +1018,6 @@ export default function ReportsPage() {
                             )}
                         </TableBody>
                     </Table>
-                    </Table>
                     </CardContent>
                 </Card>
                 </TabsContent>
