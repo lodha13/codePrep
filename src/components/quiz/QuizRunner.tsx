@@ -20,6 +20,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
+import CameraView from './CameraView';
 
 interface QuizRunnerProps {
     quiz: Quiz;
@@ -191,6 +192,7 @@ export default function QuizRunner({ quiz, questions, session, user }: QuizRunne
 
     return (
         <div className="flex h-screen flex-col bg-gray-50 text-foreground">
+            <CameraView />
             {/* Header */}
             <header className="flex h-16 shrink-0 items-center justify-between border-b bg-white px-4">
                 <div className="flex items-center gap-4">
