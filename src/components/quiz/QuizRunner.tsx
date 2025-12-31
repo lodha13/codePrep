@@ -10,9 +10,10 @@ import { doc, Timestamp, writeBatch, arrayUnion } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
-import { Flag, ChevronLeft, ChevronRight, PanelLeft, X, Check } from "lucide-react";
+import { Flag, ChevronLeft, ChevronRight, PanelLeft, X, Check, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { executeCode } from "@/lib/code-execution";
+import { useToast } from "@/components/ui/use-toast";
 import {
   Sheet,
   SheetContent,
@@ -34,10 +35,15 @@ export default function QuizRunner({ quiz, questions, session, user }: QuizRunne
     const [answers, setAnswers] = useState<Record<string, { userAnswer: string }>>({});
     const [flagged, setFlagged] = useState<Record<string, boolean>>({});
     const [submitting, setSubmitting] = useState(false);
-    
     const [isSheetOpen, setIsSheetOpen] = useState(false);
+    const [violationCount, setViolationCount] = useState(0);
+    const [isFullScreen, setIsFullScreen] = useState(false);
+    const [warningToastId, setWarningToastId] = useState<string | null>(null);
+    const [quizHasStarted, setQuizHasStarted] = useState(false);
+    const [showFullscreenVeil, setShowFullscreenVeil] = useState(false);
 
     const router = useRouter();
+    const { toast, dismiss } = useToast();
 
     const handleAnswer = useCallback((val: string) => {
         setAnswers(prev => {
@@ -69,6 +75,83 @@ export default function QuizRunner({ quiz, questions, session, user }: QuizRunne
             }
         }
     }, [session.id]);
+
+    // Effect to set a flag once the quiz has properly started
+    useEffect(() => {
+        const timer = setTimeout(() => setQuizHasStarted(true), 1500);
+        return () => clearTimeout(timer);
+    }, []);
+
+    const handleViolation = useCallback(() => {
+        if (submitting || !quizHasStarted) return;
+
+        const newCount = violationCount + 1;
+        setViolationCount(newCount);
+
+        if (warningToastId) {
+            dismiss(warningToastId);
+        }
+
+        if (newCount >= 3) {
+            handleSubmit({ terminatedByViolation: "Exited fullscreen or switched tabs multiple times." });
+        } else {
+            const { id } = toast({
+                title: (
+                    <div className="flex items-center">
+                        <AlertTriangle className="h-6 w-6 text-yellow-500 mr-3" />
+                        <span className="font-bold text-lg">Warning: Stay in Fullscreen</span>
+                    </div>
+                ),
+                description: `You have left the quiz window ${newCount} time(s). If you leave ${3 - newCount} more time(s), your quiz will be terminated automatically.`,
+                variant: "destructive",
+                duration: 10000,
+            });
+            setWarningToastId(id);
+        }
+    }, [violationCount, submitting, dismiss, toast, warningToastId, quizHasStarted]);
+
+    // Effect for managing fullscreen and violations
+    useEffect(() => {
+        const elem = document.documentElement;
+        
+        const enterFullScreen = () => {
+            if (elem.requestFullscreen && !document.fullscreenElement) {
+                elem.requestFullscreen().catch(err => {
+                    console.warn(`Could not enter full-screen mode: ${err.message}`);
+                });
+            }
+        };
+
+        const handleFullScreenChange = () => {
+            const isCurrentlyFullScreen = document.fullscreenElement != null;
+            setIsFullScreen(isCurrentlyFullScreen);
+
+            if (quizHasStarted && !isCurrentlyFullScreen && !submitting) {
+                handleViolation();
+                setShowFullscreenVeil(true);
+            } else if (isCurrentlyFullScreen) {
+                setShowFullscreenVeil(false);
+            }
+        };
+        
+        const handleVisibilityChange = () => {
+            if (quizHasStarted && document.hidden && !submitting) {
+                handleViolation();
+            }
+        };
+
+        document.addEventListener("fullscreenchange", handleFullScreenChange);
+        document.addEventListener("visibilitychange", handleVisibilityChange);
+
+        // Define enterFullScreen for the veil button
+        (window as any).enterFullScreen = enterFullScreen;
+
+        return () => {
+            document.removeEventListener("fullscreenchange", handleFullScreenChange);
+            document.removeEventListener("visibilitychange", handleVisibilityChange);
+            delete (window as any).enterFullScreen;
+        };
+    }, [submitting, handleViolation, quizHasStarted]);
     
     const handleSubmit = async (options: { terminatedByViolation?: string } = {}) => {
         if (!user || submitting) return;
@@ -192,6 +275,16 @@ export default function QuizRunner({ quiz, questions, session, user }: QuizRunne
 
     return (
         <div className="flex h-screen flex-col bg-gray-50 text-foreground">
+            {showFullscreenVeil && (
+                <div className="fixed inset-0 bg-black bg-opacity-80 z-[100] flex flex-col items-center justify-center text-white">
+                    <AlertTriangle className="h-16 w-16 text-yellow-400 mb-6" />
+                    <h2 className="text-3xl font-bold mb-3">Fullscreen Mode Required</h2>
+                    <p className="text-lg mb-8">You must be in fullscreen to continue the quiz.</p>
+                    <Button size="lg" onClick={() => (window as any).enterFullScreen()}>
+                        Re-enter Fullscreen
+                    </Button>
+                </div>
+            )}
             <CameraView />
             {/* Header */}
             <header className="flex h-16 shrink-0 items-center justify-between border-b bg-white px-4">
