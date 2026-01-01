@@ -16,7 +16,7 @@ const smtpPort = defineString("SMTP_PORT");
 const smtpUser = defineString("SMTP_USER");
 const smtpPass = defineString("SMTP_PASS");
 const allowedOrigin = defineString("ALLOWED_ORIGIN", {
-  default: "http://localhost:9002",
+  default: "https://bounteouscodex.vercel.app",
   description: "The URL of the web app allowed to call this function.",
 });
 
