@@ -117,4 +117,33 @@ export interface QuizResult {
     status: "in-progress" | "completed";
     answers: Record<string, QuestionResult>; // Map questionId to result
     timeTakenSeconds?: number;
+    terminationReason?: string;
+}
+
+
+// For external candidates not in the main user system
+export interface ExternalCandidate {
+    id: string; // This will be the unique ID for the quiz link
+    name: string;
+    email: string;
+    quizId: string;
+    quizTitle: string; // Denormalized
+    createdAt: Timestamp;
+    expiresAt: Timestamp;
+    resultId?: string; // To link to the result once completed
+}
+
+// A simplified result for external candidates
+export interface ExternalCandidateResult {
+    id: string;
+    externalCandidateId: string;
+    quizId: string;
+    startedAt: Timestamp;
+    completedAt: Timestamp;
+    score: number;
+    totalScore: number;
+    status: "completed";
+    answers: Record<string, QuestionResult>;
+    timeTakenSeconds?: number;
+    terminationReason?: string;
 }

@@ -1,5 +1,5 @@
 import { db } from "@/lib/firebase";
-import { collection, doc, getDocs, updateDoc, addDoc, deleteDoc, getDoc, writeBatch, arrayUnion, arrayRemove } from "firebase/firestore";
+import { collection, doc, getDocs, updateDoc, addDoc, deleteDoc, getDoc, writeBatch, arrayUnion, arrayRemove, Timestamp } from "firebase/firestore";
 import { Group, User, Quiz } from "@/types/schema";
 
 // Group Management
@@ -118,4 +118,18 @@ export const getUserAssignedQuizzes = async (userId: string): Promise<Quiz[]> =>
     }
     
     return quizzes;
+};
+
+// External Candidate Assignment
+export const createExternalAssignment = async (data: { name: string, email: string, quizId: string, quizTitle: string, expiresAt: Date }) => {
+    try {
+        const docRef = await addDoc(collection(db, "externalCandidates"), {
+            ...data,
+            createdAt: Timestamp.now(),
+            expiresAt: Timestamp.fromDate(data.expiresAt),
+        });
+        return { success: true, assignmentId: docRef.id };
+    } catch (error: any) {
+        return { success: false, message: error.message };
+    }
 };

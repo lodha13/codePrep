@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -16,8 +15,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { UserPlus, Edit, Search, Users } from 'lucide-react';
+import { UserPlus, Edit, Search, Users, Share2, CalendarIcon } from 'lucide-react';
 import Link from 'next/link';
+import { format } from "date-fns";
 import {
     Dialog,
     DialogContent,
@@ -27,6 +27,11 @@ import {
     DialogFooter,
     DialogTrigger,
 } from '@/components/ui/dialog';
+import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+} from "@/components/ui/popover";
 import {
     Tooltip,
     TooltipContent,
@@ -38,22 +43,40 @@ import { Trash2 } from 'lucide-react';
 import { assignQuizToUsers } from '../actions';
 import { useToast } from '@/components/ui/use-toast';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Calendar } from "@/components/ui/calendar";
 import { getGroups, assignQuizToUsersAndGroups } from '@/lib/admin-utils';
+import { getFunctions, httpsCallable } from "firebase/functions";
+import { cn } from '@/lib/utils';
+import { app } from '@/lib/firebase';
 
+
+type SerializableQuiz = Omit<Quiz, 'createdAt'> & {
+    createdAt: string;
+};
+type SerializableUser = Omit<User, 'createdAt'> & {
+    createdAt: string;
+};
 
 interface AssignQuizClientProps {
-    quizzes: Quiz[];
-    candidates: User[];
+    quizzes: SerializableQuiz[];
+    candidates: SerializableUser[];
 }
 
 export function AssignQuizClient({ quizzes, candidates }: AssignQuizClientProps) {
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [isBulkDialogOpen, setIsBulkDialogOpen] = useState(false);
     const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-    const [selectedQuiz, setSelectedQuiz] = useState<Quiz | null>(null);
+    const [isExternalDialogOpen, setIsExternalDialogOpen] = useState(false);
+    const [selectedQuiz, setSelectedQuiz] = useState<SerializableQuiz | null>(null);
     const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
     const [selectedQuizIds, setSelectedQuizIds] = useState<string[]>([]);
     const [selectedGroupIds, setSelectedGroupIds] = useState<string[]>([]);
+    const [externalCandidateName, setExternalCandidateName] = useState('');
+    const [externalCandidateEmail, setExternalCandidateEmail] = useState('');
+    const [generatedLink, setGeneratedLink] = useState<string | null>(null);
+    const [expiresAt, setExpiresAt] = useState<Date | undefined>(
+        new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+    );
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
     const [titleFilter, setTitleFilter] = useState('');
@@ -63,7 +86,7 @@ export function AssignQuizClient({ quizzes, candidates }: AssignQuizClientProps)
     const [visibilityFilter, setVisibilityFilter] = useState('');
     const [questionsSortOrder, setQuestionsSortOrder] = useState<'asc' | 'desc' | null>(null);
     const [groups, setGroups] = useState<Group[]>([]);
-    const [filteredQuizzes, setFilteredQuizzes] = useState<Quiz[]>(quizzes);
+    const [filteredQuizzes, setFilteredQuizzes] = useState<SerializableQuiz[]>(quizzes);
     const [page, setPage] = useState(1);
     const [pageSize, setPageSize] = useState(10);
     const { toast } = useToast();
@@ -136,13 +159,22 @@ export function AssignQuizClient({ quizzes, candidates }: AssignQuizClientProps)
         setPage(1);
     }, [quizzes, searchTerm, titleFilter, categoryFilter, questionsFilter, groupsFilter, visibilityFilter, questionsSortOrder, groups]);
 
-    const handleAssignClick = (quiz: Quiz) => {
+    const handleAssignClick = (quiz: SerializableQuiz) => {
         setSelectedQuiz(quiz);
         setIsDialogOpen(true);
         setSelectedUserIds([]); // Reset selections
     };
 
-    const handleDeleteClick = (quiz: Quiz) => {
+    const handleExternalAssignClick = (quiz: SerializableQuiz) => {
+        setSelectedQuiz(quiz);
+        setGeneratedLink(null);
+        setExternalCandidateName('');
+        setExternalCandidateEmail('');
+        setExpiresAt(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000));
+        setIsExternalDialogOpen(true);
+    };
+
+    const handleDeleteClick = (quiz: SerializableQuiz) => {
         setSelectedQuiz(quiz);
         setIsDeleteDialogOpen(true);
     };
@@ -251,6 +283,49 @@ export function AssignQuizClient({ quizzes, candidates }: AssignQuizClientProps)
         }
     };
 
+    const handleGenerateLink = async () => {
+        if (!selectedQuiz || !externalCandidateName || !externalCandidateEmail || !expiresAt) {
+            toast({
+                variant: 'destructive',
+                title: "Missing Information",
+                description: "Please provide all candidate details and an expiration date."
+            });
+            return;
+        }
+        setIsSubmitting(true);
+        try {
+            const functions = getFunctions(app, "us-central1");
+
+            const createAndSend = httpsCallable(functions, 'createAndSendExternalAssignment');
+            
+            const result: any = await createAndSend({
+                quizId: selectedQuiz.id,
+                quizTitle: selectedQuiz.title,
+                name: externalCandidateName,
+                email: externalCandidateEmail,
+                expiresAt: expiresAt.toISOString(),
+            });
+
+            if (result.data.success && result.data.generatedLink) {
+                setGeneratedLink(result.data.generatedLink);
+                toast({
+                    title: "Email Sent & Link Generated!",
+                    description: "The invitation has been sent to the candidate.",
+                });
+            } else {
+                throw new Error(result.data.message || "Failed to create assignment or send email.");
+            }
+        } catch (error: any) {
+            toast({
+                variant: 'destructive',
+                title: "Operation Failed",
+                description: error.message || "An unknown error occurred while calling the function.",
+            });
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
     const handleSelectAllQuizzes = (checked: boolean) => {
         setSelectedQuizIds(checked ? filteredQuizzes.map(q => q.id) : []);
     };
@@ -261,7 +336,7 @@ export function AssignQuizClient({ quizzes, candidates }: AssignQuizClientProps)
         );
     };
 
-    const getGroupsDisplay = (quiz: Quiz) => {
+    const getGroupsDisplay = (quiz: SerializableQuiz) => {
         const assignedGroups = groups.filter(g => quiz.assignedGroupIds?.includes(g.id));
         if (assignedGroups.length === 0) return null;
         
@@ -429,6 +504,9 @@ export function AssignQuizClient({ quizzes, candidates }: AssignQuizClientProps)
                                                 <Button variant="outline" size="sm" onClick={() => handleAssignClick(quiz)}>
                                                     <UserPlus className="mr-2 h-4 w-4" />
                                                 </Button>
+                                                <Button variant="outline" size="sm" onClick={() => handleExternalAssignClick(quiz)}>
+                                                    <Share2 className="h-4 w-4" />
+                                                </Button>
                                                 <Button variant="destructive" size="sm" onClick={() => handleDeleteClick(quiz)}>
                                                     <Trash2 className="mr-2 h-4 w-4" />
                                                 </Button>
@@ -553,6 +631,98 @@ export function AssignQuizClient({ quizzes, candidates }: AssignQuizClientProps)
                             {isSubmitting ? "Deleting..." : "Delete"}
                         </Button>
                     </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* External Assignment Dialog */}
+            <Dialog open={isExternalDialogOpen} onOpenChange={setIsExternalDialogOpen}>
+                <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>Assign to External Candidate</DialogTitle>
+                        <DialogDescription>
+                            Generate a unique link to share with an external candidate for the quiz: "{selectedQuiz?.title}".
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                        {generatedLink ? (
+                            <div className="space-y-3">
+                                <p className="text-sm text-muted-foreground">Share this link with the candidate:</p>
+                                <Input
+                                    readOnly
+                                    value={generatedLink}
+                                    className="text-sm"
+                                />
+                                <Button
+                                    size="sm"
+                                    onClick={() => {
+                                        navigator.clipboard.writeText(generatedLink);
+                                        toast({ title: "Copied to clipboard!" });
+                                    }}
+                                >
+                                    Copy Link
+                                </Button>
+                            </div>
+                        ) : (
+                            <>
+                                <div className="space-y-2">
+                                    <label htmlFor="name" className="text-sm font-medium">Candidate Name</label>
+                                    <Input
+                                        id="name"
+                                        placeholder="e.g., Jane Doe"
+                                        value={externalCandidateName}
+                                        onChange={(e) => setExternalCandidateName(e.target.value)}
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <label htmlFor="email" className="text-sm font-medium">Candidate Email</label>
+                                    <Input
+                                        id="email"
+                                        type="email"
+                                        placeholder="e.g., jane.doe@example.com"
+                                        value={externalCandidateEmail}
+                                        onChange={(e) => setExternalCandidateEmail(e.target.value)}
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <label htmlFor="expiresAt" className="text-sm font-medium">Expires At</label>
+                                    <Popover>
+                                        <PopoverTrigger asChild>
+                                            <Button
+                                                variant={"outline"}
+                                                className={cn(
+                                                    "w-full justify-start text-left font-normal",
+                                                    !expiresAt && "text-muted-foreground"
+                                                )}
+                                            >
+                                                <CalendarIcon className="mr-2 h-4 w-4" />
+                                                {expiresAt ? format(expiresAt, "PPP") : <span>Pick a date</span>}
+                                            </Button>
+                                        </PopoverTrigger>
+                                        <PopoverContent className="w-auto p-0">
+                                            <Calendar
+                                                mode="single"
+                                                selected={expiresAt}
+                                                onSelect={setExpiresAt}
+                                                initialFocus
+                                            />
+                                        </PopoverContent>
+                                    </Popover>
+                                </div>
+                            </>
+                        )}
+                    </div>
+                    {!generatedLink && (
+                        <DialogFooter>
+                            <Button type="button" variant="secondary" onClick={() => setIsExternalDialogOpen(false)}>Cancel</Button>
+                            <Button
+                                type="submit"
+                                onClick={handleGenerateLink}
+                                disabled={isSubmitting || !externalCandidateName || !externalCandidateEmail || !expiresAt}
+                            >
+                                {isSubmitting ? "Generating..." : "Generate Link"}
+                            </Button>
+                        </DialogFooter>
+                    )}
                 </DialogContent>
             </Dialog>
         </TooltipProvider>

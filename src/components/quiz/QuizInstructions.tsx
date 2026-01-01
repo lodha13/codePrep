@@ -8,9 +8,20 @@ import { Button } from '@/components/ui/button';
 import { ShieldAlert, Monitor, ArrowRight, Laptop } from 'lucide-react';
 import { useToast } from '../ui/use-toast';
 
+type SerializableQuiz = Omit<Quiz, 'createdAt'> & {
+    createdAt: string;
+};
+
+// A more flexible user type for display purposes
+type DisplayUser = {
+    name?: string;
+    displayName?: string;
+    email: string;
+}
+
 interface QuizInstructionsProps {
-    quiz: Quiz;
-    user: User;
+    quiz: SerializableQuiz;
+    user: DisplayUser;
     onStart: () => void;
 }
 
