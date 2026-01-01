@@ -18,8 +18,31 @@ export default function QuizInstructions({ quiz, user, onStart }: QuizInstructio
     const [loading, setLoading] = useState(false);
     const { toast } = useToast();
 
-    const requestFullscreen = async () => {
+    const handleStart = async () => {
         setLoading(true);
+
+        // 1. Check for camera permission first
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+            // Immediately stop the tracks, as we only need to check for permission here.
+            // The CameraView component will manage its own stream.
+            stream.getTracks().forEach(track => track.stop());
+        } catch (error) {
+            toast({
+                variant: 'destructive',
+                title: "Camera Permission Required",
+                description: "You must grant camera access to start the quiz. Please enable camera permissions in your browser settings and try again.",
+                duration: 8000,
+            });
+            setLoading(false);
+            return; // Abort starting the quiz
+        }
+
+        // 2. If camera permission is granted, proceed to request fullscreen
+        await requestFullscreen();
+    };
+
+    const requestFullscreen = async () => {
         const element = document.documentElement;
         try {
             if (element.requestFullscreen) {
@@ -29,13 +52,13 @@ export default function QuizInstructions({ quiz, user, onStart }: QuizInstructio
             } else if ((element as any).msRequestFullscreen) {
                 await (element as any).msRequestFullscreen();
             }
+            // onStart is called only after fullscreen is successful
             onStart();
         } catch (error) {
-            console.error("Fullscreen request failed:", error);
             toast({
                 variant: 'destructive',
                 title: "Fullscreen Required",
-                description: "Please enable fullscreen mode in your browser to start the quiz.",
+                description: "The quiz must be taken in fullscreen mode. Please allow fullscreen and try again.",
             });
             setLoading(false);
         }
@@ -71,6 +94,9 @@ export default function QuizInstructions({ quiz, user, onStart }: QuizInstructio
                         </h3>
                         <ul className="list-disc space-y-2 pl-5 text-sm text-muted-foreground">
                             <li>
+                                You must grant **camera and fullscreen access** to start the test.
+                            </li>
+                            <li>
                                 This test will be conducted in a **proctored, full-screen environment**.
                             </li>
                             <li>
@@ -86,7 +112,7 @@ export default function QuizInstructions({ quiz, user, onStart }: QuizInstructio
                     </div>
                 </CardContent>
                 <CardFooter className="flex flex-col items-center">
-                    <Button onClick={requestFullscreen} disabled={loading} size="lg" className="w-full max-w-xs">
+                    <Button onClick={handleStart} disabled={loading} size="lg" className="w-full max-w-xs">
                         {loading ? "Starting..." : (
                             <>
                                 Start Quiz in Fullscreen

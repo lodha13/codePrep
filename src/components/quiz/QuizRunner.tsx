@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Quiz, Question, QuestionResult, QuizResult, MCQQuestion, CodingQuestion } from "@/types/schema";
 import { Button } from "@/components/ui/button";
 import MCQView from "./MCQView";
@@ -21,7 +21,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
-import CameraView from './CameraView';
+import CameraView, { CameraViewHandle } from './CameraView';
 
 interface QuizRunnerProps {
     quiz: Quiz;
@@ -41,6 +41,7 @@ export default function QuizRunner({ quiz, questions, session, user }: QuizRunne
     const [warningToastId, setWarningToastId] = useState<string | null>(null);
     const [quizHasStarted, setQuizHasStarted] = useState(false);
     const [showFullscreenVeil, setShowFullscreenVeil] = useState(false);
+    const cameraRef = useRef<CameraViewHandle>(null);
 
     const router = useRouter();
     const { toast, dismiss } = useToast();
@@ -140,8 +141,13 @@ export default function QuizRunner({ quiz, questions, session, user }: QuizRunne
             }
         };
 
+        const handlePageHide = () => {
+            cameraRef.current?.stopStream();
+        };
+
         document.addEventListener("fullscreenchange", handleFullScreenChange);
         document.addEventListener("visibilitychange", handleVisibilityChange);
+        window.addEventListener("pagehide", handlePageHide);
 
         // Define enterFullScreen for the veil button
         (window as any).enterFullScreen = enterFullScreen;
@@ -149,12 +155,15 @@ export default function QuizRunner({ quiz, questions, session, user }: QuizRunne
         return () => {
             document.removeEventListener("fullscreenchange", handleFullScreenChange);
             document.removeEventListener("visibilitychange", handleVisibilityChange);
+            window.removeEventListener("pagehide", handlePageHide);
             delete (window as any).enterFullScreen;
         };
     }, [submitting, handleViolation, quizHasStarted]);
     
     const handleSubmit = async (options: { terminatedByViolation?: string } = {}) => {
         if (!user || submitting) return;
+
+        cameraRef.current?.stopStream();
         
         const { terminatedByViolation } = options;
 
@@ -165,7 +174,11 @@ export default function QuizRunner({ quiz, questions, session, user }: QuizRunne
                 const confirmed = window.confirm(
                     `You have only answered ${answeredQuestionsCount} out of ${totalQuestionsCount} questions. Are you sure you want to submit?`
                 );
-                if (!confirmed) return;
+                if (!confirmed) {
+                    // If user cancels, submission is aborted. The camera has been stopped,
+                    // which is acceptable as the user has actively chosen to interrupt the flow.
+                    return;
+                }
             }
         }
         
@@ -285,7 +298,7 @@ export default function QuizRunner({ quiz, questions, session, user }: QuizRunne
                     </Button>
                 </div>
             )}
-            <CameraView />
+            <CameraView ref={cameraRef} />
             {/* Header */}
             <header className="flex h-16 shrink-0 items-center justify-between border-b bg-white px-4">
                 <div className="flex items-center gap-4">
