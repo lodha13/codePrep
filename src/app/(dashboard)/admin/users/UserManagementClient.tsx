@@ -41,8 +41,12 @@ import { collection, query, where, getDocs } from 'firebase/firestore';
 import Pagination from '@/components/ui/pagination';
 
 
+type SerializableUser = Omit<User, 'createdAt'> & {
+    createdAt: string;
+};
+
 interface UserManagementClientProps {
-    initialUsers: User[];
+    initialUsers: SerializableUser[];
 }
 
 export function UserManagementClient({ initialUsers }: UserManagementClientProps) {
@@ -50,7 +54,7 @@ export function UserManagementClient({ initialUsers }: UserManagementClientProps
     const [filteredUsers, setFilteredUsers] = useState(initialUsers);
     const [searchTerm, setSearchTerm] = useState('');
     const [loading, setLoading] = useState<Record<string, boolean>>({});
-    const [selectedUser, setSelectedUser] = useState<User | null>(null);
+    const [selectedUser, setSelectedUser] = useState<SerializableUser | null>(null);
     const [userResults, setUserResults] = useState<QuizResult[]>([]);
     const [loadingResults, setLoadingResults] = useState(false);
     const [allQuizzes, setAllQuizzes] = useState<any[]>([]);
@@ -138,13 +142,13 @@ export function UserManagementClient({ initialUsers }: UserManagementClientProps
         }
     };
 
-    const handleViewUser = (user: User) => {
+    const handleViewUser = (user: SerializableUser) => {
         setSelectedUser(user);
         fetchUserResults(user.uid);
         calculateUserQuizStats(user);
     };
 
-    const calculateUserQuizStats = async (user: User) => {
+    const calculateUserQuizStats = async (user: SerializableUser) => {
         try {
             // Fetch all quizzes if not already available
             let quizzes = allQuizzes;
@@ -188,7 +192,13 @@ export function UserManagementClient({ initialUsers }: UserManagementClientProps
 
     const formatDate = (timestamp: any) => {
         if (!timestamp) return 'N/A';
-        return timestamp.toDate ? timestamp.toDate().toLocaleDateString() : new Date(timestamp).toLocaleDateString();
+        if (timestamp.toDate) {
+            return timestamp.toDate().toLocaleDateString();
+        }
+        if (typeof timestamp === 'string') {
+            return new Date(timestamp).toLocaleDateString();
+        }
+        return new Date(timestamp).toLocaleDateString();
     };
 
     return (

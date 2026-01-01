@@ -13,7 +13,7 @@ export const getUsers = cache(async (): Promise<User[]> => {
         const data = d.data();
         return {
             ...data,
-            createdAt: (data.createdAt as Timestamp).toDate(),
+            createdAt: (data.createdAt as Timestamp).toDate().toISOString(),
         } as User;
     });
     return usersList;
@@ -46,7 +46,7 @@ export const getQuizzes = cache(async (): Promise<Quiz[]> => {
         return {
             id: d.id,
             ...data,
-            createdAt: (data.createdAt as Timestamp).toDate(),
+            createdAt: (data.createdAt as Timestamp).toDate().toISOString(),
         } as Quiz;
     });
     return quizzesList;
