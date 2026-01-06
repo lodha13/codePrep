@@ -90,7 +90,9 @@ export const createAndSendExternalAssignment = onCall(
       const assignmentId = assignmentRef.id;
       logger.info("Successfully created document with ID:", assignmentId);
       
-      const quizLink = `${allowedOrigin.value()}/take-quiz/${assignmentId}`;
+      const origin = request.rawRequest.headers.origin || allowedOrigin.value();
+      const quizLink = `${origin}/take-quiz/${assignmentId}`;
+      //const quizLink = `${allowedOrigin.value()}/take-quiz/${assignmentId}`;
 
       // 3. Initialize Nodemailer and send the email
       const transporter = nodemailer.createTransport({
