@@ -4,7 +4,7 @@
 import { useState } from 'react';
 import { ExternalCandidate, Quiz, Question } from '@/types/schema';
 import QuizInstructions from '@/components/quiz/QuizInstructions';
-import ExternalQuizRunner from '@/components/quiz/ExternalQuizRunner';
+import QuizRunner from '@/components/quiz/QuizRunner';
 
 // Create a type for the props where Timestamps have been converted to strings
 type SerializableExternalCandidate = Omit<ExternalCandidate, 'createdAt' | 'expiresAt'> & {
@@ -43,7 +43,8 @@ export default function ExternalQuizClient({ assignment, quiz, questions }: Exte
     }
     
     return (
-        <ExternalQuizRunner
+        <QuizRunner
+            mode="external"
             quiz={quiz}
             questions={questions}
             externalCandidate={assignment}

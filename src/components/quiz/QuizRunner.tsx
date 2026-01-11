@@ -2,13 +2,12 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { Quiz, Question, QuestionResult, QuizResult, MCQQuestion, CodingQuestion } from "@/types/schema";
+import { Quiz, Question, QuestionResult, QuizResult, MCQQuestion, CodingQuestion, ExternalCandidate } from "@/types/schema";
 import { Button } from "@/components/ui/button";
 import MCQView from "./MCQView";
 import CodingView from "./CodingView";
-import { doc, Timestamp, writeBatch, arrayUnion } from "firebase/firestore";
+import { doc, Timestamp, writeBatch, arrayUnion, addDoc, collection } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
 import { Flag, ChevronLeft, ChevronRight, PanelLeft, X, Check, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -23,14 +22,35 @@ import {
 } from "@/components/ui/sheet";
 import CameraView, { CameraViewHandle } from './CameraView';
 
-interface QuizRunnerProps {
-    quiz: Quiz;
-    questions: Question[];
-    session: QuizResult;
-    user: any; // Add user prop
-}
 
-export default function QuizRunner({ quiz, questions, session, user }: QuizRunnerProps) {
+// Define a serializable version for props that come from server components
+type SerializableExternalCandidate = Omit<ExternalCandidate, 'createdAt' | 'expiresAt'> & {
+    createdAt: string;
+    expiresAt: string;
+};
+type SerializableQuiz = Omit<Quiz, 'createdAt'> & {
+    createdAt: string;
+};
+type SerializableQuestion = Omit<Question, 'createdAt'> & {
+    createdAt: string;
+};
+
+// Discriminated union for props
+type QuizRunnerProps = {
+    quiz: SerializableQuiz | Quiz;
+    questions: (SerializableQuestion | Question)[];
+} & ({
+    mode: 'internal';
+    session: QuizResult;
+    user: any; // Keep existing user type
+} | {
+    mode: 'external';
+    externalCandidate: SerializableExternalCandidate;
+});
+
+
+export default function QuizRunner(props: QuizRunnerProps) {
+    const { quiz, questions } = props;
     const [currentIndex, setCurrentIndex] = useState(0);
     const [answers, setAnswers] = useState<Record<string, { userAnswer: string }>>({});
     const [flagged, setFlagged] = useState<Record<string, boolean>>({});
@@ -45,6 +65,14 @@ export default function QuizRunner({ quiz, questions, session, user }: QuizRunne
 
     const router = useRouter();
     const { toast, dismiss } = useToast();
+    
+    // Determine the unique ID and localStorage key based on the mode
+    const persistentId = props.mode === 'internal' ? props.session.id : props.externalCandidate.id;
+    const storageKey = `quiz-${props.mode}-${persistentId}`;
+    const startTime = props.mode === 'internal' 
+        ? (props.session.startedAt instanceof Timestamp ? props.session.startedAt : Timestamp.fromDate(new Date(props.session.startedAt)))
+        : Timestamp.now();
+
 
     const handleAnswer = useCallback((val: string) => {
         setAnswers(prev => {
@@ -54,19 +82,17 @@ export default function QuizRunner({ quiz, questions, session, user }: QuizRunne
                     userAnswer: val,
                 }
             };
-            // Save to localStorage for persistence across page refreshes
             if (typeof window !== 'undefined') {
-                localStorage.setItem(`quiz-${session.id}-answers`, JSON.stringify(newAnswers));
+                localStorage.setItem(storageKey, JSON.stringify(newAnswers));
             }
             return newAnswers;
         });
-    }, [currentIndex, questions, session.id]);
+    }, [currentIndex, questions, storageKey]);
 
 
-    // Load answers from localStorage on initial render
     useEffect(() => {
         if (typeof window !== 'undefined') {
-            const saved = localStorage.getItem(`quiz-${session.id}-answers`);
+            const saved = localStorage.getItem(storageKey);
             if (saved) {
                 try {
                     setAnswers(JSON.parse(saved));
@@ -75,9 +101,9 @@ export default function QuizRunner({ quiz, questions, session, user }: QuizRunne
                 }
             }
         }
-    }, [session.id]);
+    }, [storageKey]);
 
-    // Effect to set a flag once the quiz has properly started
+
     useEffect(() => {
         const timer = setTimeout(() => setQuizHasStarted(true), 1500);
         return () => clearTimeout(timer);
@@ -111,7 +137,6 @@ export default function QuizRunner({ quiz, questions, session, user }: QuizRunne
         }
     }, [violationCount, submitting, dismiss, toast, warningToastId, quizHasStarted]);
 
-    // Effect for managing fullscreen and violations
     useEffect(() => {
         const elem = document.documentElement;
         
@@ -149,7 +174,6 @@ export default function QuizRunner({ quiz, questions, session, user }: QuizRunne
         document.addEventListener("visibilitychange", handleVisibilityChange);
         window.addEventListener("pagehide", handlePageHide);
 
-        // Define enterFullScreen for the veil button
         (window as any).enterFullScreen = enterFullScreen;
 
         return () => {
@@ -161,7 +185,9 @@ export default function QuizRunner({ quiz, questions, session, user }: QuizRunne
     }, [submitting, handleViolation, quizHasStarted]);
     
     const handleSubmit = async (options: { terminatedByViolation?: string } = {}) => {
-        if (!user || submitting) return;
+        if (submitting) return;
+        if (props.mode === 'internal' && !props.user) return;
+
 
         cameraRef.current?.stopStream();
         
@@ -175,8 +201,6 @@ export default function QuizRunner({ quiz, questions, session, user }: QuizRunne
                     `You have only answered ${answeredQuestionsCount} out of ${totalQuestionsCount} questions. Are you sure you want to submit?`
                 );
                 if (!confirmed) {
-                    // If user cancels, submission is aborted. The camera has been stopped,
-                    // which is acceptable as the user has actively chosen to interrupt the flow.
                     return;
                 }
             }
@@ -234,35 +258,58 @@ export default function QuizRunner({ quiz, questions, session, user }: QuizRunne
         }
 
         const batch = writeBatch(db);
-        const resultDocRef = doc(db, "results", session.id);
         const completedAt = Timestamp.now();
-        const startTime = session.startedAt instanceof Timestamp ? session.startedAt : Timestamp.fromDate(new Date(session.startedAt));
         const timeTakenSeconds = completedAt.seconds - startTime.seconds;
 
-        const updatePayload: any = {
-            answers: finalAnswers,
-            score: totalQuizScore,
-            totalScore: maxQuizScore,
-            status: "completed",
-            completedAt,
-            timeTakenSeconds
-        };
+        if (props.mode === 'internal') {
+            const resultDocRef = doc(db, "results", props.session.id);
+            const updatePayload: any = {
+                answers: finalAnswers,
+                score: totalQuizScore,
+                totalScore: maxQuizScore,
+                status: "completed",
+                completedAt,
+                timeTakenSeconds
+            };
+            if (terminatedByViolation) updatePayload.terminationReason = terminatedByViolation;
 
-        if (terminatedByViolation) {
-            updatePayload.terminationReason = terminatedByViolation;
-        }
+            batch.update(resultDocRef, updatePayload);
+            
+            const userDocRef = doc(db, "users", props.user.uid);
+            batch.update(userDocRef, { completedQuizIds: arrayUnion(quiz.id) });
+            
+            await batch.commit();
+            
+            if (typeof window !== 'undefined') localStorage.removeItem(storageKey);
+            
+            router.replace(`/results/${props.session.id}`);
 
-        batch.update(resultDocRef, updatePayload);
-        
-        const userDocRef = doc(db, "users", user.uid);
-        batch.update(userDocRef, { completedQuizIds: arrayUnion(quiz.id) });
-        await batch.commit();
-        
-        if (typeof window !== 'undefined') {
-            localStorage.removeItem(`quiz-${session.id}-answers`);
+        } else { // mode is 'external'
+            const resultPayload: any = {
+                externalCandidateId: props.externalCandidate.id,
+                quizId: quiz.id,
+                startedAt: startTime,
+                answers: finalAnswers,
+                score: totalQuizScore,
+                totalScore: maxQuizScore,
+                status: "completed",
+                completedAt,
+                timeTakenSeconds
+            };
+            if (terminatedByViolation) resultPayload.terminationReason = terminatedByViolation;
+
+            const resultDocRef = doc(collection(db, "externalCandidateResults"));
+            batch.set(resultDocRef, resultPayload);
+            
+            const assignmentDocRef = doc(db, "externalCandidates", props.externalCandidate.id);
+            batch.update(assignmentDocRef, { resultId: resultDocRef.id });
+            
+            await batch.commit();
+            
+            if (typeof window !== 'undefined') localStorage.removeItem(storageKey);
+            
+            router.replace(`/quiz/thank-you`);
         }
-        
-        router.replace(`/results/${session.id}`);
     };
 
     const handleNavigation = (nextIndex: number) => {
@@ -273,7 +320,7 @@ export default function QuizRunner({ quiz, questions, session, user }: QuizRunne
 
     const handleQuestionJump = (index: number) => {
         setCurrentIndex(index);
-        setIsSheetOpen(false); // Close sheet on selection
+        setIsSheetOpen(false);
     };
 
     const handleToggleFlag = () => {

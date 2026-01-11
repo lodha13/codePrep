@@ -114,5 +114,5 @@ export default function QuizPage() {
         return <QuizInstructions quiz={quiz} user={user} onStart={handleStartQuiz} />;
     }
 
-    return <QuizRunner quiz={quiz} questions={questions} session={quizSession} user={user} />;
+    return <QuizRunner mode="internal" quiz={quiz} questions={questions} session={quizSession} user={user} />;
 }
