@@ -16,7 +16,7 @@ const smtpPort = defineString("SMTP_PORT");
 const smtpUser = defineString("SMTP_USER");
 const smtpPass = defineString("SMTP_PASS");
 const allowedOrigin = defineString("ALLOWED_ORIGIN", {
-  default: "http://localhost:9002",
+  default: "https://bounteouscodex.vercel.app",
   description: "The URL of the web app allowed to call this function.",
 });
 
@@ -90,7 +90,9 @@ export const createAndSendExternalAssignment = onCall(
       const assignmentId = assignmentRef.id;
       logger.info("Successfully created document with ID:", assignmentId);
       
-      const quizLink = `${allowedOrigin.value()}/take-quiz/${assignmentId}`;
+      const origin = request.rawRequest.headers.origin || allowedOrigin.value();
+      const quizLink = `${origin}/take-quiz/${assignmentId}`;
+      //const quizLink = `${allowedOrigin.value()}/take-quiz/${assignmentId}`;
 
       // 3. Initialize Nodemailer and send the email
       const transporter = nodemailer.createTransport({

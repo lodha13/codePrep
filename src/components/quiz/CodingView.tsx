@@ -73,10 +73,12 @@ export default function CodingView({ question, onCodeChange, currentCode }: Codi
                                 {res.passed ? 'Passed' : 'Failed'}
                             </span>
                         </div>
-                        <Card className="bg-muted border-border p-3 font-mono text-sm">
-                            <p><span className="font-semibold text-muted-foreground">Input:</span> {res.input}</p>
-                            <p><span className="font-semibold text-muted-foreground">Expected:</span> {res.expected}</p>
-                            <p><span className="font-semibold text-muted-foreground">Your Output:</span> {res.actual}</p>
+                        <Card className="bg-muted border-border font-mono text-sm">
+                            <div className="p-3 overflow-x-auto">
+                                <p className="whitespace-nowrap"><span className="font-semibold text-muted-foreground">Input:</span> {res.input}</p>
+                                <p className="whitespace-nowrap"><span className="font-semibold text-muted-foreground">Expected:</span> {res.expected}</p>
+                                <p className="whitespace-nowrap"><span className="font-semibold text-muted-foreground">Your Output:</span> {res.actual}</p>
+                            </div>
                         </Card>
                     </div>
                 ))}
@@ -181,24 +183,24 @@ export default function CodingView({ question, onCodeChange, currentCode }: Codi
                                 <TabsTrigger value="testcases" className="text-xs rounded-none data-[state=active]:bg-background">Test Cases</TabsTrigger>
                                 <TabsTrigger value="output" className="text-xs rounded-none data-[state=active]:bg-background">Output</TabsTrigger>
                             </TabsList>
-                            <TabsContent value="testcases" className="flex-grow mt-0">
-                               <ScrollArea className="h-full p-4">
+                            <TabsContent value="testcases" className="flex-grow mt-0 overflow-hidden">
+                               <div className="h-full overflow-y-auto p-4">
                                     {question.testCases.filter(tc => !tc.isHidden).map((tc, i) => (
                                         <Card key={i} className="mb-2 bg-muted p-3 font-mono text-sm">
-                                            <CardContent className="p-0">
-                                                <p><span className="font-semibold text-muted-foreground">Input:</span> {tc.input}</p>
-                                                <p><span className="font-semibold text-muted-foreground">Expected Output:</span> {tc.expectedOutput}</p>
+                                            <CardContent className="p-0 overflow-x-auto">
+                                                <p className="whitespace-nowrap"><span className="font-semibold text-muted-foreground">Input:</span> {tc.input}</p>
+                                                <p className="whitespace-nowrap"><span className="font-semibold text-muted-foreground">Expected Output:</span> {tc.expectedOutput}</p>
                                             </CardContent>
                                         </Card>
                                     ))}
-                               </ScrollArea>
+                               </div>
                             </TabsContent>
-                            <TabsContent value="output" className="flex-grow mt-0">
-                               <ScrollArea className="h-full p-4">
+                            <TabsContent value="output" className="flex-grow mt-0 overflow-hidden">
+                               <div className="h-full overflow-y-auto p-4">
                                     <div className="text-sm font-mono whitespace-pre-wrap">
                                         {renderOutput()}
                                     </div>
-                               </ScrollArea>
+                               </div>
                             </TabsContent>
                         </Tabs>
                     </div>
