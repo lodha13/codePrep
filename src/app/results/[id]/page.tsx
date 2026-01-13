@@ -33,8 +33,17 @@ export default function ResultPage() {
             if (!id || !user) return;
             setLoading(true);
 
-            const resultRef = doc(db, "results", id as string);
-            const resultSnap = await getDoc(resultRef);
+            // Try to fetch from regular results first
+            let resultRef = doc(db, "results", id as string);
+            let resultSnap = await getDoc(resultRef);
+            let isExternalResult = false;
+
+            // If not found in regular results, try external candidate results
+            if (!resultSnap.exists()) {
+                resultRef = doc(db, "externalCandidateResults", id as string);
+                resultSnap = await getDoc(resultRef);
+                isExternalResult = true;
+            }
 
             if (!resultSnap.exists()) {
                 setLoading(false);
@@ -43,8 +52,9 @@ export default function ResultPage() {
 
             const resultData = { id: resultSnap.id, ...resultSnap.data() } as QuizResult;
             
-            // Allow admins to view any result, candidates can only view their own
-            if (user.role !== 'admin' && resultData.userId !== user.uid) {
+            // For external results, admins can view any result
+            // For regular results, allow admins to view any result, candidates can only view their own
+            if (!isExternalResult && user.role !== 'admin' && resultData.userId !== user.uid) {
                 setLoading(false);
                 return;
             }

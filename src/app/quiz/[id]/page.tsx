@@ -50,13 +50,25 @@ export default function QuizPage() {
                     return;
                 }
                 const currentQuiz = { id: quizSnap.id, ...quizSnap.data() } as Quiz;
+                
+                // 3. Authorization Check
+                const isAssigned = user.assignedQuizIds?.includes(currentQuiz.id);
+                const isPublic = currentQuiz.isPublic;
+                const isAdmin = user.role === 'admin';
+
+                if (!isPublic && !isAssigned && !isAdmin) {
+                    setError("You are not authorized to take this quiz.");
+                    setLoading(false);
+                    return;
+                }
+                
                 setQuiz(currentQuiz);
 
-                // 3. Get or create session
+                // 4. Get or create session
                 const session = await getOrCreateQuizSession(user.uid, quizId as string, currentQuiz.title) as QuizResult;
                 setQuizSession(session);
 
-                // 4. Fetch questions for the quiz
+                // 5. Fetch questions for the quiz
                 if (session && currentQuiz?.questionIds?.length) {
                     const qQuery = query(collection(db, "questions"), where(documentId(), "in", currentQuiz.questionIds));
                     const qSnap = await getDocs(qQuery);

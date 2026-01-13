@@ -23,10 +23,17 @@ import {
     DialogTitle,
     DialogTrigger,
 } from "@/components/ui/dialog";
-import { Users, Trophy, AlertTriangle, Eye, Search, Calendar } from "lucide-react";
+import { getExternalCandidatesWithResults } from "@/lib/admin-utils";
+import { ExternalCandidate, ExternalCandidateResult } from "@/types/schema";
+import { Users, Trophy, AlertTriangle, Eye, Search, Calendar, ExternalLink, Clock, CheckCircle, XCircle } from "lucide-react";
 import Link from "next/link";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import Pagination from '@/components/ui/pagination';
+
+interface ExternalCandidateWithResult extends ExternalCandidate {
+    result: ExternalCandidateResult | null;
+    status: 'pending' | 'completed' | 'expired';
+}
 
 interface User {
     id: string;
@@ -58,6 +65,17 @@ interface QuizResult {
 }
 
 export default function ReportsPage() {
+    const [externalCandidates, setExternalCandidates] = useState<ExternalCandidateWithResult[]>([]);
+    const [filteredExternalCandidates, setFilteredExternalCandidates] = useState<ExternalCandidateWithResult[]>([]);
+    const [externalNameFilter, setExternalNameFilter] = useState<string>("");
+    const [externalEmailFilter, setExternalEmailFilter] = useState<string>("");
+    const [externalStatusFilter, setExternalStatusFilter] = useState<string>("all");
+    const [externalSortBy, setExternalSortBy] = useState<string>("createdAt");
+    const [externalSortOrder, setExternalSortOrder] = useState<string>("desc");
+    const [externalPage, setExternalPage] = useState(1);
+    const [externalPageSize, setExternalPageSize] = useState(10);
+    const [selectedExternalCandidate, setSelectedExternalCandidate] = useState<ExternalCandidateWithResult | null>(null);
+
     const [users, setUsers] = useState<User[]>([]);
     const [quizzes, setQuizzes] = useState<Quiz[]>([]);
     const [results, setResults] = useState<QuizResult[]>([]);
@@ -86,7 +104,12 @@ export default function ReportsPage() {
 
     useEffect(() => {
         fetchData();
+        fetchExternalCandidates();
     }, []);
+
+    useEffect(() => {
+        filterExternalCandidates();
+    }, [externalCandidates, externalNameFilter, externalEmailFilter, externalStatusFilter, externalSortBy, externalSortOrder]);
 
     useEffect(() => {
         if (users.length && quizzes.length && results.length) {
@@ -140,6 +163,79 @@ export default function ReportsPage() {
     const formatDate = (timestamp: any) => {
         if (!timestamp) return 'N/A';
         return timestamp.toDate ? timestamp.toDate().toLocaleDateString() : new Date(timestamp).toLocaleDateString();
+    };
+
+    const fetchExternalCandidates = async () => {
+        try {
+            const candidatesWithResults = await getExternalCandidatesWithResults();
+            setExternalCandidates(candidatesWithResults);
+        } catch (error) {
+            console.error("Error fetching external candidates:", error);
+        }
+    };
+
+    const filterExternalCandidates = () => {
+        let filtered = [...externalCandidates];
+        
+        // Apply name filter
+        if (externalNameFilter) {
+            filtered = filtered.filter(candidate => 
+                candidate.name.toLowerCase().includes(externalNameFilter.toLowerCase())
+            );
+        }
+        
+        // Apply email filter
+        if (externalEmailFilter) {
+            filtered = filtered.filter(candidate => 
+                candidate.email.toLowerCase().includes(externalEmailFilter.toLowerCase())
+            );
+        }
+        
+        // Apply status filter
+        if (externalStatusFilter !== "all") {
+            filtered = filtered.filter(candidate => candidate.status === externalStatusFilter);
+        }
+        
+        // Sort the array
+        filtered.sort((a, b) => {
+            let aVal, bVal;
+            switch (externalSortBy) {
+                case 'name':
+                    aVal = a.name.toLowerCase();
+                    bVal = b.name.toLowerCase();
+                    break;
+                case 'email':
+                    aVal = a.email.toLowerCase();
+                    bVal = b.email.toLowerCase();
+                    break;
+                case 'quizTitle':
+                    aVal = a.quizTitle.toLowerCase();
+                    bVal = b.quizTitle.toLowerCase();
+                    break;
+                case 'completedAt':
+                    aVal = a.result?.completedAt?.toDate() || new Date(0);
+                    bVal = b.result?.completedAt?.toDate() || new Date(0);
+                    break;
+                case 'score':
+                    aVal = a.result ? (a.result.totalScore > 0 ? (a.result.score / a.result.totalScore) * 100 : 0) : 0;
+                    bVal = b.result ? (b.result.totalScore > 0 ? (b.result.score / b.result.totalScore) * 100 : 0) : 0;
+                    break;
+                case 'createdAt':
+                default:
+                    aVal = a.createdAt.toDate();
+                    bVal = b.createdAt.toDate();
+                    break;
+            }
+            
+            if (externalSortOrder === 'asc') {
+                return aVal > bVal ? 1 : -1;
+            } else {
+                return aVal < bVal ? 1 : -1;
+            }
+        });
+        
+        setFilteredExternalCandidates(filtered);
+        setExternalPage(1);
     };
 
     const fetchData = async () => {
@@ -384,6 +480,7 @@ export default function ReportsPage() {
                 <TabsList>
                     <TabsTrigger value="assignments">Assignment Progress</TabsTrigger>
                     <TabsTrigger value="rankings">Candidate Rankings</TabsTrigger>
+                    <TabsTrigger value="external">External Report</TabsTrigger>
                 </TabsList>
                 
                 <TabsContent value="assignments" className="space-y-6">
@@ -1021,6 +1118,264 @@ export default function ReportsPage() {
                     </CardContent>
                 </Card>
                 </TabsContent>
+                
+                <TabsContent value="external" className="space-y-6">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2">
+                                <ExternalLink className="h-5 w-5 text-blue-500" />
+                                External Candidate Report
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <Pagination
+                                total={filteredExternalCandidates.length}
+                                page={externalPage}
+                                pageSize={externalPageSize}
+                                onPageChange={(p) => setExternalPage(Math.max(1, Math.min(Math.ceil(filteredExternalCandidates.length / externalPageSize) || 1, p)))}
+                                onPageSizeChange={(s) => { setExternalPageSize(s); setExternalPage(1); }}
+                            />
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>
+                                            <div className="space-y-2">
+                                                <span>Name</span>
+                                                <Input
+                                                    placeholder="Filter by name..."
+                                                    value={externalNameFilter}
+                                                    onChange={(e) => setExternalNameFilter(e.target.value)}
+                                                    className="h-8 text-xs"
+                                                />
+                                            </div>
+                                        </TableHead>
+                                        <TableHead>
+                                            <div className="space-y-2">
+                                                <span>Email</span>
+                                                <Input
+                                                    placeholder="Filter by email..."
+                                                    value={externalEmailFilter}
+                                                    onChange={(e) => setExternalEmailFilter(e.target.value)}
+                                                    className="h-8 text-xs"
+                                                />
+                                            </div>
+                                        </TableHead>
+                                        <TableHead>Quiz</TableHead>
+                                        <TableHead>
+                                            <div className="space-y-2">
+                                                <span>Status</span>
+                                                <Select value={externalStatusFilter} onValueChange={setExternalStatusFilter}>
+                                                    <SelectTrigger className="h-8 text-xs">
+                                                        <SelectValue />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        <SelectItem value="all">All</SelectItem>
+                                                        <SelectItem value="pending">Pending</SelectItem>
+                                                        <SelectItem value="completed">Completed</SelectItem>
+                                                        <SelectItem value="expired">Expired</SelectItem>
+                                                    </SelectContent>
+                                                </Select>
+                                            </div>
+                                        </TableHead>
+                                        <TableHead>
+                                            <div className="flex items-center gap-1">
+                                                <span>Assigned</span>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    onClick={() => {
+                                                        if (externalSortBy === 'createdAt') {
+                                                            setExternalSortOrder(externalSortOrder === 'asc' ? 'desc' : 'asc');
+                                                        } else {
+                                                            setExternalSortBy('createdAt');
+                                                            setExternalSortOrder('desc');
+                                                        }
+                                                    }}
+                                                    className="h-6 w-6 p-0"
+                                                >
+                                                    {externalSortBy === 'createdAt' ? (externalSortOrder === 'asc' ? '↑' : '↓') : '↕'}
+                                                </Button>
+                                            </div>
+                                        </TableHead>
+                                        <TableHead>
+                                            <div className="flex items-center gap-1">
+                                                <span>Completed</span>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    onClick={() => {
+                                                        if (externalSortBy === 'completedAt') {
+                                                            setExternalSortOrder(externalSortOrder === 'asc' ? 'desc' : 'asc');
+                                                        } else {
+                                                            setExternalSortBy('completedAt');
+                                                            setExternalSortOrder('desc');
+                                                        }
+                                                    }}
+                                                    className="h-6 w-6 p-0"
+                                                >
+                                                    {externalSortBy === 'completedAt' ? (externalSortOrder === 'asc' ? '↑' : '↓') : '↕'}
+                                                </Button>
+                                            </div>
+                                        </TableHead>
+                                        <TableHead>Score</TableHead>
+                                        <TableHead>Actions</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {filteredExternalCandidates.length === 0 ? (
+                                        <TableRow>
+                                            <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                                                No external candidates found.
+                                            </TableCell>
+                                        </TableRow>
+                                    ) : (
+                                        filteredExternalCandidates.slice((externalPage - 1) * externalPageSize, externalPage * externalPageSize).map(candidate => (
+                                            <TableRow key={candidate.id}>
+                                                <TableCell>
+                                                    <p className="font-medium">{candidate.name}</p>
+                                                </TableCell>
+                                                <TableCell>
+                                                    <p className="text-sm text-muted-foreground">{candidate.email}</p>
+                                                </TableCell>
+                                                <TableCell>
+                                                    <p className="text-sm">{candidate.quizTitle}</p>
+                                                </TableCell>
+                                                <TableCell>
+                                                    <Badge 
+                                                        variant={candidate.status === 'completed' ? 'default' : candidate.status === 'expired' ? 'destructive' : 'secondary'}
+                                                        className="flex items-center gap-1 w-fit"
+                                                    >
+                                                        {candidate.status === 'completed' && <CheckCircle className="h-3 w-3" />}
+                                                        {candidate.status === 'expired' && <XCircle className="h-3 w-3" />}
+                                                        {candidate.status === 'pending' && <Clock className="h-3 w-3" />}
+                                                        {candidate.status.charAt(0).toUpperCase() + candidate.status.slice(1)}
+                                                    </Badge>
+                                                </TableCell>
+                                                <TableCell>
+                                                    <p className="text-sm">{formatDate(candidate.createdAt)}</p>
+                                                </TableCell>
+                                                <TableCell>
+                                                    <p className="text-sm">
+                                                        {candidate.result?.completedAt ? formatDate(candidate.result.completedAt) : 'N/A'}
+                                                    </p>
+                                                </TableCell>
+                                                <TableCell>
+                                                    {candidate.result ? (
+                                                        <Badge variant={candidate.result.totalScore > 0 && (candidate.result.score / candidate.result.totalScore) * 100 >= 70 ? "default" : "destructive"}>
+                                                            {candidate.result.totalScore > 0 ? Math.round((candidate.result.score / candidate.result.totalScore) * 100) : 0}%
+                                                        </Badge>
+                                                    ) : (
+                                                        <span className="text-sm text-muted-foreground">N/A</span>
+                                                    )}
+                                                </TableCell>
+                                                <TableCell>
+                                                    <Dialog>
+                                                        <DialogTrigger asChild>
+                                                            <Button
+                                                                variant="outline"
+                                                                size="sm"
+                                                                onClick={() => setSelectedExternalCandidate(candidate)}
+                                                            >
+                                                                <Eye className="h-4 w-4" />
+                                                            </Button>
+                                                        </DialogTrigger>
+                                                        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+                                                            <DialogHeader>
+                                                                <DialogTitle>External Candidate: {candidate.name}</DialogTitle>
+                                                            </DialogHeader>
+                                                            {selectedExternalCandidate?.id === candidate.id && (
+                                                                <div className="space-y-6">
+                                                                    <Card>
+                                                                        <CardHeader>
+                                                                            <CardTitle className="text-lg">Candidate Information</CardTitle>
+                                                                        </CardHeader>
+                                                                        <CardContent>
+                                                                            <div className="grid grid-cols-2 gap-4">
+                                                                                <div>
+                                                                                    <p className="text-sm font-medium">Name</p>
+                                                                                    <p className="text-sm text-muted-foreground">{candidate.name}</p>
+                                                                                </div>
+                                                                                <div>
+                                                                                    <p className="text-sm font-medium">Email</p>
+                                                                                    <p className="text-sm text-muted-foreground">{candidate.email}</p>
+                                                                                </div>
+                                                                                <div>
+                                                                                    <p className="text-sm font-medium">Quiz</p>
+                                                                                    <p className="text-sm text-muted-foreground">{candidate.quizTitle}</p>
+                                                                                </div>
+                                                                                <div>
+                                                                                    <p className="text-sm font-medium">Status</p>
+                                                                                    <Badge 
+                                                                                        variant={candidate.status === 'completed' ? 'default' : candidate.status === 'expired' ? 'destructive' : 'secondary'}
+                                                                                        className="flex items-center gap-1 w-fit"
+                                                                                    >
+                                                                                        {candidate.status === 'completed' && <CheckCircle className="h-3 w-3" />}
+                                                                                        {candidate.status === 'expired' && <XCircle className="h-3 w-3" />}
+                                                                                        {candidate.status === 'pending' && <Clock className="h-3 w-3" />}
+                                                                                        {candidate.status.charAt(0).toUpperCase() + candidate.status.slice(1)}
+                                                                                    </Badge>
+                                                                                </div>
+                                                                                <div>
+                                                                                    <p className="text-sm font-medium">Assigned Date</p>
+                                                                                    <p className="text-sm text-muted-foreground">{formatDate(candidate.createdAt)}</p>
+                                                                                </div>
+                                                                                <div>
+                                                                                    <p className="text-sm font-medium">Expires At</p>
+                                                                                    <p className="text-sm text-muted-foreground">{formatDate(candidate.expiresAt)}</p>
+                                                                                </div>
+                                                                            </div>
+                                                                        </CardContent>
+                                                                    </Card>
+
+                                                                    {candidate.result && (
+                                                                        <Card>
+                                                                            <CardHeader>
+                                                                                <CardTitle className="text-lg flex items-center gap-2">
+                                                                                    <Trophy className="h-5 w-5" />
+                                                                                    Quiz Result
+                                                                                </CardTitle>
+                                                                            </CardHeader>
+                                                                            <CardContent>
+                                                                                <div className="flex items-center justify-between p-3 border rounded-lg">
+                                                                                    <div>
+                                                                                        <h4 className="font-semibold">{candidate.quizTitle}</h4>
+                                                                                        <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                                                                                            <div className="flex items-center gap-1">
+                                                                                                <Trophy className="h-4 w-4" />
+                                                                                                <span>Score: {Math.round((candidate.result.score || 0) * 10) / 10}/{candidate.result.totalScore}</span>
+                                                                                            </div>
+                                                                                            <div className="flex items-center gap-1">
+                                                                                                <Calendar className="h-4 w-4" />
+                                                                                                <span>Completed: {formatDate(candidate.result.completedAt)}</span>
+                                                                                            </div>
+                                                                                        </div>
+                                                                                    </div>
+                                                                                    <div className="text-right">
+                                                                                        <div className="text-lg font-bold">
+                                                                                            {candidate.result.totalScore > 0 ? Math.round((candidate.result.score / candidate.result.totalScore) * 100) : 0}%
+                                                                                        </div>
+                                                                                        <Button asChild variant="outline" size="sm">
+                                                                                            <Link href={`/results/${candidate.result.id}`}>View Details</Link>
+                                                                                        </Button>
+                                                                                    </div>
+                                                                                </div>
+                                                                            </CardContent>
+                                                                        </Card>
+                                                                    )}
+                                                                </div>
+                                                            )}
+                                                        </DialogContent>
+                                                    </Dialog>
+                                                </TableCell>
+                                            </TableRow>
+                                        ))
+                                    )}
+                                </TableBody>
+                            </Table>
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+
             </Tabs>
         </div>
     );

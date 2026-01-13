@@ -66,7 +66,7 @@ async function getExternalQuizData(assignmentId: string) {
     return { assignment: serializableAssignment, quiz: serializableQuiz, questions: serializableQuestions };
 }
 
-export default async function ExternalQuizPage({ params }: ExternalQuizPageProps) {
+export default async function ExternalQuizPage({ params }: { params: { assignmentId: string } }) {
     const data = await getExternalQuizData(params.assignmentId);
 
     if (!data) {

@@ -1,6 +1,6 @@
 import { db } from "@/lib/firebase";
-import { collection, doc, getDocs, updateDoc, addDoc, deleteDoc, getDoc, writeBatch, arrayUnion, arrayRemove, Timestamp } from "firebase/firestore";
-import { Group, User, Quiz } from "@/types/schema";
+import { collection, doc, getDocs, updateDoc, addDoc, deleteDoc, getDoc, writeBatch, arrayUnion, arrayRemove, Timestamp, query, where, documentId } from "firebase/firestore";
+import { Group, User, Quiz, ExternalCandidate, ExternalCandidateResult } from "@/types/schema";
 
 // Group Management
 export const createGroup = async (groupData: Omit<Group, 'id'>) => {
@@ -58,33 +58,32 @@ export const removeUsersFromGroup = async (groupId: string, userIds: string[]) =
 export const assignQuizToUsersAndGroups = async (quizId: string, userIds: string[] = [], groupIds: string[] = []) => {
     const batch = writeBatch(db);
     
-    // Update quiz with assignments
+    // Update quiz with assignment relationships
     const quizRef = doc(db, "quizzes", quizId);
     const updates: any = {};
     if (userIds.length > 0) updates.assignedUserIds = arrayUnion(...userIds);
     if (groupIds.length > 0) updates.assignedGroupIds = arrayUnion(...groupIds);
-    batch.update(quizRef, updates);
+    if (Object.keys(updates).length > 0) {
+        batch.update(quizRef, updates);
+    }
     
-    // Update individual users
+    // Update individual users' assignedQuizIds for DIRECT assignment
     userIds.forEach(userId => {
         const userRef = doc(db, "users", userId);
         batch.update(userRef, { assignedQuizIds: arrayUnion(quizId) });
     });
     
-    // Update group members
-    for (const groupId of groupIds) {
-        const groupDoc = await getDoc(doc(db, "groups", groupId));
-        if (groupDoc.exists()) {
-            const group = groupDoc.data() as Group;
-            group.memberIds?.forEach(userId => {
-                const userRef = doc(db, "users", userId);
-                batch.update(userRef, { assignedQuizIds: arrayUnion(quizId) });
-            });
-        }
+    // Update groups' assignedQuizIds for GROUP assignment
+    if (groupIds.length > 0) {
+        groupIds.forEach(groupId => {
+            const groupRef = doc(db, "groups", groupId);
+            batch.update(groupRef, { assignedQuizIds: arrayUnion(quizId) });
+        });
     }
     
     await batch.commit();
 };
+
 
 // Get user's assigned quizzes (direct + group assignments)
 export const getUserAssignedQuizzes = async (userId: string): Promise<Quiz[]> => {
@@ -96,25 +95,34 @@ export const getUserAssignedQuizzes = async (userId: string): Promise<Quiz[]> =>
     
     // Get quizzes assigned to user's groups
     const groupQuizIds: string[] = [];
-    if (user.groupIds?.length) {
-        const quizzesSnapshot = await getDocs(collection(db, "quizzes"));
-        quizzesSnapshot.docs.forEach(doc => {
-            const quiz = doc.data() as Quiz;
-            if (quiz.assignedGroupIds?.some(groupId => user.groupIds?.includes(groupId))) {
-                groupQuizIds.push(doc.id);
-            }
+    if (user.groupIds && user.groupIds.length > 0) {
+        const q = query(collection(db, "quizzes"), where("assignedGroupIds", "array-contains-any", user.groupIds));
+        const quizzesSnapshot = await getDocs(q);
+        quizzesSnapshot.forEach(doc => {
+            groupQuizIds.push(doc.id);
         });
     }
     
     const allQuizIds = [...new Set([...directQuizIds, ...groupQuizIds])];
     
     // Fetch quiz details
+    if (allQuizIds.length === 0) return [];
+
     const quizzes: Quiz[] = [];
-    for (const quizId of allQuizIds) {
-        const quizDoc = await getDoc(doc(db, "quizzes", quizId));
-        if (quizDoc.exists()) {
-            quizzes.push({ id: quizDoc.id, ...quizDoc.data() } as Quiz);
-        }
+    // Firestore 'in' query is limited to 30 elements.
+    // We need to batch the requests if there are more.
+    const batches = [];
+    for (let i = 0; i < allQuizIds.length; i += 30) {
+        const batchIds = allQuizIds.slice(i, i + 30);
+        const q = query(collection(db, "quizzes"), where(documentId(), "in", batchIds));
+        batches.push(getDocs(q));
+    }
+
+    const allBatches = await Promise.all(batches);
+    for (const batchSnapshot of allBatches) {
+        batchSnapshot.forEach(doc => {
+            quizzes.push({ id: doc.id, ...doc.data() } as Quiz);
+        });
     }
     
     return quizzes;
@@ -133,3 +141,46 @@ export const createExternalAssignment = async (data: { name: string, email: stri
         return { success: false, message: error.message };
     }
 };
+
+// Get all external candidates with their results
+export const getExternalCandidatesWithResults = async () => {
+    try {
+        // Fetch external candidates
+        const candidatesSnapshot = await getDocs(collection(db, "externalCandidates"));
+        const candidates = candidatesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        
+        // Fetch external candidate results
+        const resultsSnapshot = await getDocs(collection(db, "externalCandidateResults"));
+        const results = resultsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        
+        // Combine candidates with their results
+        const candidatesWithResults = candidates.map(candidate => {
+            const result = results.find(r => r.externalCandidateId === candidate.id);
+            return {
+                ...candidate,
+                result: result || null,
+                status: result ? 'completed' : (new Date() > candidate.expiresAt.toDate() ? 'expired' : 'pending')
+            };
+        });
+        
+        return candidatesWithResults;
+    } catch (error) {
+        console.error('Error fetching external candidates:', error);
+        return [];
+    }
+};
+
+// Get external candidate result details
+export const getExternalCandidateResult = async (resultId: string) => {
+    try {
+        const resultDoc = await getDoc(doc(db, "externalCandidateResults", resultId));
+        if (resultDoc.exists()) {
+            return { id: resultDoc.id, ...resultDoc.data() };
+        }
+        return null;
+    } catch (error) {
+        console.error('Error fetching external candidate result:', error);
+        return null;
+    }
+};
+
