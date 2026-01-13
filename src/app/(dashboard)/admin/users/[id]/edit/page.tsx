@@ -18,6 +18,7 @@ import { getGroups, assignUsersToGroup, removeUsersFromGroup } from "@/lib/admin
 export default function EditUserPage({ params }: { params: Promise<{ id: string }> }) {
     const resolvedParams = use(params);
     const [user, setUser] = useState<User | null>(null);
+    const [initialUser, setInitialUser] = useState<User | null>(null);
     const [groups, setGroups] = useState<Group[]>([]);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
@@ -33,7 +34,9 @@ export default function EditUserPage({ params }: { params: Promise<{ id: string 
                 ]);
 
                 if (userDoc.exists()) {
-                    setUser({ uid: userDoc.id, ...userDoc.data() } as User);
+                    const userData = { uid: userDoc.id, ...userDoc.data() } as User;
+                    setUser(userData);
+                    setInitialUser(userData);
                 }
                 setGroups(groupsData);
             } catch (error) {
@@ -46,23 +49,46 @@ export default function EditUserPage({ params }: { params: Promise<{ id: string 
     }, [resolvedParams.id, toast]);
 
     const handleSave = async () => {
-        if (!user) return;
+        if (!user || !initialUser) return;
         setSaving(true);
         try {
-            // Update user document
-            await updateDoc(doc(db, "users", user.uid), {
+            // Determine which groups were added and removed
+            const initialGroupIds = initialUser.groupIds || [];
+            const currentGroupIds = user.groupIds || [];
+    
+            const addedGroupIds = currentGroupIds.filter(id => !initialGroupIds.includes(id));
+            const removedGroupIds = initialGroupIds.filter(id => !currentGroupIds.includes(id));
+    
+            const updatePromises = [];
+    
+            // Update basic user info (without touching groupIds)
+            const userUpdateData: any = {
                 displayName: user.displayName,
                 role: user.role,
                 isBench: user.isBench,
-                groupIds: user.groupIds || []
-            });
-
-            // Note: Group membership sync is handled by the admin-utils functions
-            // when groups are assigned/removed from the UI
+            };
+            updatePromises.push(updateDoc(doc(db, "users", user.uid), userUpdateData));
+    
+            // For each added group, add the user to it.
+            if (addedGroupIds.length > 0) {
+                addedGroupIds.forEach(groupId => {
+                    updatePromises.push(assignUsersToGroup(groupId, [user.uid]));
+                });
+            }
+    
+            // For each removed group, remove the user from it.
+            if (removedGroupIds.length > 0) {
+                removedGroupIds.forEach(groupId => {
+                    updatePromises.push(removeUsersFromGroup(groupId, [user.uid]));
+                });
+            }
+    
+            await Promise.all(updatePromises);
 
             toast({ title: "User updated successfully" });
             router.back();
         } catch (error) {
+            console.error("Error updating user:", error);
             toast({ variant: "destructive", title: "Error updating user" });
         } finally {
             setSaving(false);

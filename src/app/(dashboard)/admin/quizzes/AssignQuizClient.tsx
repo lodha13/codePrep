@@ -40,7 +40,6 @@ import {
 } from '@/components/ui/tooltip';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Trash2 } from 'lucide-react';
-import { assignQuizToUsers } from '../actions';
 import { useToast } from '@/components/ui/use-toast';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Calendar } from "@/components/ui/calendar";
@@ -196,19 +195,18 @@ export function AssignQuizClient({ quizzes, candidates }: AssignQuizClientProps)
         }
 
         setIsSubmitting(true);
-        const result = await assignQuizToUsers(selectedQuiz.id, selectedUserIds);
-
-        if (result.success) {
+        try {
+            await assignQuizToUsersAndGroups(selectedQuiz.id, selectedUserIds);
             toast({
                 title: "Quiz Assigned!",
                 description: `Successfully assigned "${selectedQuiz.title}" to ${selectedUserIds.length} user(s).`,
             });
             setIsDialogOpen(false);
-        } else {
-            toast({
+        } catch (error) {
+             toast({
                 variant: 'destructive',
                 title: "Assignment Failed",
-                description: result.message || "An unknown error occurred.",
+                description: "An unknown error occurred.",
             });
         }
         setIsSubmitting(false);
@@ -532,21 +530,29 @@ export function AssignQuizClient({ quizzes, candidates }: AssignQuizClientProps)
                         <ScrollArea className="h-72 w-full rounded-md border">
                             <div className="p-4">
                                 <h4 className="mb-4 text-sm font-medium leading-none">Candidates</h4>
-                                {candidates.map((user) => (
-                                    <div key={user.uid} className="flex items-center space-x-2 mb-2 p-2 rounded-md hover:bg-secondary">
-                                        <Checkbox
-                                            id={`user-${user.uid}`}
-                                            checked={selectedUserIds.includes(user.uid)}
-                                            onCheckedChange={() => handleUserToggle(user.uid)}
-                                        />
-                                        <label
-                                            htmlFor={`user-${user.uid}`}
-                                            className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 flex-1"
-                                        >
-                                            {user.displayName} ({user.email})
-                                        </label>
-                                    </div>
-                                ))}
+                                {candidates.map((user) => {
+                                    const userGroupIds = user.groupIds || [];
+                                    const quizGroupIds = selectedQuiz?.assignedGroupIds || [];
+                                    const hasQuizViaGroup = userGroupIds.some(userGroupId => quizGroupIds.includes(userGroupId));
+                                    
+                                    return (
+                                        <div key={user.uid} className="flex items-center space-x-2 mb-2 p-2 rounded-md hover:bg-secondary">
+                                            <Checkbox
+                                                id={`user-${user.uid}`}
+                                                checked={selectedUserIds.includes(user.uid)}
+                                                onCheckedChange={() => handleUserToggle(user.uid)}
+                                                disabled={hasQuizViaGroup}
+                                            />
+                                            <label
+                                                htmlFor={`user-${user.uid}`}
+                                                className={`text-sm font-medium leading-none flex-1 ${hasQuizViaGroup ? 'text-muted-foreground' : ''}`}
+                                            >
+                                                {user.displayName} ({user.email})
+                                                {hasQuizViaGroup && <span className="text-xs ml-2">(Assigned via group)</span>}
+                                            </label>
+                                        </div>
+                                    );
+                                })}
                             </div>
                         </ScrollArea>
                     </div>
@@ -646,7 +652,7 @@ export function AssignQuizClient({ quizzes, candidates }: AssignQuizClientProps)
                     <div className="space-y-4 py-4">
                         {generatedLink ? (
                             <div className="space-y-3">
-                                <p className="text-sm text-muted-foreground">Share this link with the candidate:</p>
+.                                <p className="text-sm text-muted-foreground">Share this link with the candidate:</p>
                                 <Input
                                     readOnly
                                     value={generatedLink}

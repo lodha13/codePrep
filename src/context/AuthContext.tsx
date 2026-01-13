@@ -4,7 +4,7 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import { User as FirebaseUser, onAuthStateChanged, signOut as firebaseSignOut } from "firebase/auth";
 import { auth, db } from "@/lib/firebase";
-import { doc, getDoc, setDoc } from "firebase/firestore";
+import { collection, query, where, getDocs, doc, getDoc, setDoc } from "firebase/firestore";
 import { User, UserRole } from "@/types/schema";
 import { useRouter, usePathname } from "next/navigation";
 
@@ -68,6 +68,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 const userDocRef = doc(db, "users", fbUser.uid);
                 const userDoc = await getDoc(userDocRef);
                 let appUser: User | null = null;
+
                 if (userDoc.exists()) {
                     appUser = userDoc.data() as User;
                 } else {
@@ -81,6 +82,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     await setDoc(userDocRef, newUser);
                     appUser = newUser;
                 }
+
+                if (appUser) {
+                    // Get all assigned quiz IDs (direct and from groups) to provide a complete list for client-side auth checks
+                    const directQuizIds = appUser.assignedQuizIds || [];
+                    const groupQuizIds: string[] = [];
+                    if (appUser.groupIds && appUser.groupIds.length > 0) {
+                        const q = query(collection(db, "quizzes"), where("assignedGroupIds", "array-contains-any", appUser.groupIds));
+                        const quizzesSnapshot = await getDocs(q);
+                        quizzesSnapshot.forEach(doc => {
+                            groupQuizIds.push(doc.id);
+                        });
+                    }
+                    // The full list of quizzes the user has access to
+                    appUser.assignedQuizIds = [...new Set([...directQuizIds, ...groupQuizIds])];
+                }
+
                 setUser(appUser);
                 
                 // Client-side redirect after login
