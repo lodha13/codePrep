@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/components/ui/use-toast";
-import { createGroup, getGroups, assignUsersToGroup } from "@/lib/admin-utils";
+import { createGroup, getGroups, assignUsersToGroup, removeUsersFromGroup } from "@/lib/admin-utils";
 import { getUsers } from "../actions";
 import { PlusCircle, Users } from "lucide-react";
 
@@ -19,8 +19,12 @@ export default function GroupsPage() {
     const [users, setUsers] = useState<User[]>([]);
     const [isCreateOpen, setIsCreateOpen] = useState(false);
     const [isAssignOpen, setIsAssignOpen] = useState(false);
+    const [showGroupUsersModal, setShowGroupUsersModal] = useState(false);
+    const [groupSearch, setGroupSearch] = useState("");
     const [selectedGroup, setSelectedGroup] = useState<Group | null>(null);
     const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
+    const [selectedToAddIds, setSelectedToAddIds] = useState<string[]>([]);
+    const [selectedToRemoveIds, setSelectedToRemoveIds] = useState<string[]>([]);
     const [newGroupName, setNewGroupName] = useState("");
     const [newGroupDescription, setNewGroupDescription] = useState("");
     const [loading, setLoading] = useState(true);
@@ -37,7 +41,8 @@ export default function GroupsPage() {
                 getUsers()
             ]);
             setGroups(groupsData);
-            setUsers(usersData.filter(u => u.role === 'candidate'));
+            // include all users (admins + candidates)
+            setUsers(usersData);
         } catch (error) {
             toast({ variant: "destructive", title: "Error loading data" });
         } finally {
@@ -152,7 +157,7 @@ export default function GroupsPage() {
                                             size="sm"
                                             onClick={() => {
                                                 setSelectedGroup(group);
-                                                setIsAssignOpen(true);
+                                                setShowGroupUsersModal(true);
                                             }}
                                         >
                                             <Users className="mr-2 h-4 w-4" />
@@ -192,6 +197,133 @@ export default function GroupsPage() {
                         <Button onClick={handleAssignUsers} className="w-full">
                             Assign Selected Users
                         </Button>
+                    </div>
+                </DialogContent>
+            </Dialog>
+
+            <Dialog open={showGroupUsersModal} onOpenChange={setShowGroupUsersModal}>
+                <DialogContent className="max-w-5xl max-h-[85vh]">
+                    <DialogHeader>
+                        <DialogTitle>Users in {selectedGroup?.name}</DialogTitle>
+                    </DialogHeader>
+                    <div className="p-4">
+                        <input
+                            type="text"
+                            placeholder="Search by name or email"
+                            className="w-full p-2 border rounded-md mb-3"
+                            value={groupSearch}
+                            onChange={(e) => setGroupSearch(e.target.value)}
+                        />
+
+                        <div className="grid grid-cols-2 gap-4">
+                            {/* Current members */}
+                            <div>
+                                <div className="mb-2 font-medium">Current Members</div>
+                                <div className="max-h-[60vh] overflow-y-auto space-y-2 border rounded p-2 bg-white">
+                                    {users
+                                        .filter(u => selectedGroup && (
+                                            (selectedGroup.memberIds && selectedGroup.memberIds.includes(u.uid)) ||
+                                            (u.groupIds && u.groupIds.includes(selectedGroup!.id))
+                                        ))
+                                        .filter(u => {
+                                            const q = groupSearch.toLowerCase();
+                                            return (
+                                                (u.displayName || '').toLowerCase().includes(q) ||
+                                                (u.email || '').toLowerCase().includes(q)
+                                            );
+                                        })
+                                        .map(user => (
+                                            <label key={user.uid} className="flex items-center justify-between p-2 rounded hover:bg-gray-50">
+                                                <div>
+                                                    <div className="font-medium">{user.displayName}</div>
+                                                    <div className="text-xs text-gray-500">{user.email}</div>
+                                                </div>
+                                                <input
+                                                    type="checkbox"
+                                                    checked={selectedToRemoveIds.includes(user.uid)}
+                                                    onChange={(e) => {
+                                                        if (e.target.checked) setSelectedToRemoveIds(prev => [...prev, user.uid]);
+                                                        else setSelectedToRemoveIds(prev => prev.filter(id => id !== user.uid));
+                                                    }}
+                                                    className="h-4 w-4"
+                                                />
+                                            </label>
+                                        ))}
+                                </div>
+                                <div className="mt-3">
+                                    <Button
+                                        onClick={async () => {
+                                            if (!selectedGroup || selectedToRemoveIds.length === 0) return;
+                                            try {
+                                                await removeUsersFromGroup(selectedGroup.id, selectedToRemoveIds);
+                                                toast({ title: 'Users removed from group' });
+                                                setSelectedToRemoveIds([]);
+                                                loadData();
+                                            } catch (err) {
+                                                toast({ variant: 'destructive', title: 'Error removing users' });
+                                            }
+                                        }}
+                                        className="w-full bg-red-600 hover:bg-red-700 text-white"
+                                    >
+                                        Remove Selected
+                                    </Button>
+                                </div>
+                            </div>
+
+                            {/* Available users to add */}
+                            <div>
+                                <div className="mb-2 font-medium">Available Users (not in group)</div>
+                                <div className="max-h-[60vh] overflow-y-auto space-y-2 border rounded p-2 bg-white">
+                                    {users
+                                        .filter(u => selectedGroup && !(
+                                            (selectedGroup.memberIds && selectedGroup.memberIds.includes(u.uid)) ||
+                                            (u.groupIds && u.groupIds.includes(selectedGroup!.id))
+                                        ))
+                                        .filter(u => {
+                                            const q = groupSearch.toLowerCase();
+                                            return (
+                                                (u.displayName || '').toLowerCase().includes(q) ||
+                                                (u.email || '').toLowerCase().includes(q)
+                                            );
+                                        })
+                                        .map(user => (
+                                            <label key={user.uid} className="flex items-center justify-between p-2 rounded hover:bg-gray-50">
+                                                <div>
+                                                    <div className="font-medium">{user.displayName}</div>
+                                                    <div className="text-xs text-gray-500">{user.email}</div>
+                                                </div>
+                                                <input
+                                                    type="checkbox"
+                                                    checked={selectedToAddIds.includes(user.uid)}
+                                                    onChange={(e) => {
+                                                        if (e.target.checked) setSelectedToAddIds(prev => [...prev, user.uid]);
+                                                        else setSelectedToAddIds(prev => prev.filter(id => id !== user.uid));
+                                                    }}
+                                                    className="h-4 w-4"
+                                                />
+                                            </label>
+                                        ))}
+                                </div>
+                                <div className="mt-3">
+                                    <Button
+                                        onClick={async () => {
+                                            if (!selectedGroup || selectedToAddIds.length === 0) return;
+                                            try {
+                                                await assignUsersToGroup(selectedGroup.id, selectedToAddIds);
+                                                toast({ title: 'Users added to group' });
+                                                setSelectedToAddIds([]);
+                                                loadData();
+                                            } catch (err) {
+                                                toast({ variant: 'destructive', title: 'Error adding users' });
+                                            }
+                                        }}
+                                        className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+                                    >
+                                        Add Selected
+                                    </Button>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </DialogContent>
             </Dialog>

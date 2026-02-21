@@ -29,6 +29,7 @@ import { Users, Trophy, AlertTriangle, Eye, Search, Calendar, ExternalLink, Cloc
 import Link from "next/link";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import Pagination from '@/components/ui/pagination';
+import { GroupReportClient } from "../groups/GroupReportClient";
 
 interface ExternalCandidateWithResult extends ExternalCandidate {
     result: ExternalCandidateResult | null;
@@ -77,6 +78,7 @@ export default function ReportsPage() {
     const [selectedExternalCandidate, setSelectedExternalCandidate] = useState<ExternalCandidateWithResult | null>(null);
 
     const [users, setUsers] = useState<User[]>([]);
+    const [groups, setGroups] = useState<any[]>([]);
     const [quizzes, setQuizzes] = useState<Quiz[]>([]);
     const [results, setResults] = useState<QuizResult[]>([]);
     const [incompleteUsers, setIncompleteUsers] = useState<any[]>([]);
@@ -158,6 +160,15 @@ export default function ReportsPage() {
         setSelectedUser(user);
         fetchUserResults(user.id);
         calculateUserQuizStats(user);
+    };
+
+    const [openDetailDialog, setOpenDetailDialog] = useState(false);
+
+    const handleViewUserOpen = (user: User) => {
+        setSelectedUser(user);
+        fetchUserResults(user.id);
+        calculateUserQuizStats(user);
+        setOpenDetailDialog(true);
     };
 
     const formatDate = (timestamp: any) => {
@@ -250,6 +261,11 @@ export default function ReportsPage() {
             const quizzesSnap = await getDocs(collection(db, "quizzes"));
             const quizzesData = quizzesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Quiz));
             setQuizzes(quizzesData);
+
+            // Fetch groups
+            const groupsSnap = await getDocs(collection(db, "groups"));
+            const groupsData = groupsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            setGroups(groupsData);
 
             // Fetch results
             const resultsSnap = await getDocs(query(collection(db, "results"), where("status", "==", "completed")));
@@ -481,6 +497,7 @@ export default function ReportsPage() {
                     <TabsTrigger value="assignments">Assignment Progress</TabsTrigger>
                     <TabsTrigger value="rankings">Candidate Rankings</TabsTrigger>
                     <TabsTrigger value="external">External Report</TabsTrigger>
+                    <TabsTrigger value="group">Group Report</TabsTrigger>
                 </TabsList>
                 
                 <TabsContent value="assignments" className="space-y-6">
@@ -821,6 +838,10 @@ export default function ReportsPage() {
                     </Table>
                     </CardContent>
                 </Card>
+                </TabsContent>
+
+                <TabsContent value="group" className="space-y-6">
+                    <GroupReportClient groups={groups} users={users} quizzes={quizzes} results={results} onViewUser={handleViewUserOpen} />
                 </TabsContent>
                 
                 <TabsContent value="rankings" className="space-y-6">
@@ -1377,6 +1398,119 @@ export default function ReportsPage() {
                 </TabsContent>
 
             </Tabs>
+
+            <Dialog open={openDetailDialog} onOpenChange={(v) => { setOpenDetailDialog(v); if (!v) setSelectedUser(null); }}>
+                <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+                    <DialogHeader>
+                        <DialogTitle>Candidate Details: {selectedUser?.displayName || selectedUser?.email}</DialogTitle>
+                    </DialogHeader>
+                    {selectedUser && (
+                        <div className="space-y-6">
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle className="text-lg">User Information</CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <p className="text-sm font-medium">Name</p>
+                                            <p className="text-sm text-muted-foreground">{selectedUser.displayName || 'N/A'}</p>
+                                        </div>
+                                        <div>
+                                            <p className="text-sm font-medium">Email</p>
+                                            <p className="text-sm text-muted-foreground">{selectedUser.email}</p>
+                                        </div>
+                                        <div>
+                                            <p className="text-sm font-medium">Total Assigned Quizzes</p>
+                                            <p className="text-sm text-muted-foreground">{userQuizStats?.totalAssigned || 0}</p>
+                                        </div>
+                                        <div>
+                                            <p className="text-sm font-medium">Completed Quizzes</p>
+                                            <p className="text-sm text-muted-foreground">{userQuizStats?.totalCompleted || 0}</p>
+                                        </div>
+                                        <div>
+                                            <p className="text-sm font-medium">Pending Quizzes</p>
+                                            <p className="text-sm text-muted-foreground">{userQuizStats?.pendingCount || 0}</p>
+                                        </div>
+                                        <div>
+                                            <p className="text-sm font-medium">Progress</p>
+                                            <p className="text-sm text-muted-foreground">
+                                                {userQuizStats?.totalAssigned > 0 
+                                                    ? Math.round((userQuizStats.totalCompleted / userQuizStats.totalAssigned) * 100)
+                                                    : 0}% Complete
+                                            </p>
+                                        </div>
+                                    </div>
+                                </CardContent>
+                            </Card>
+
+                            {userQuizStats?.pendingQuizzes?.length > 0 && (
+                                <Card>
+                                    <CardHeader>
+                                        <CardTitle className="text-lg flex items-center gap-2">
+                                            <AlertTriangle className="h-5 w-5 text-orange-500" />
+                                            Pending Quizzes ({userQuizStats.pendingCount})
+                                        </CardTitle>
+                                    </CardHeader>
+                                    <CardContent>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                                            {userQuizStats.pendingQuizzes.map((quiz: any) => (
+                                                <div key={quiz.id} className="p-2 bg-orange-50 border border-orange-200 rounded text-sm">
+                                                    {quiz.title}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                            )}
+
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle className="text-lg flex items-center gap-2">
+                                        <Trophy className="h-5 w-5" />
+                                        Completed Quiz Results
+                                    </CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                    {loadingResults ? (
+                                        <p className="text-center py-4">Loading results...</p>
+                                    ) : userResults.length === 0 ? (
+                                        <p className="text-center py-4 text-muted-foreground">No completed quizzes found.</p>
+                                    ) : (
+                                        <div className="space-y-3">
+                                            {userResults.map((result) => (
+                                                <div key={result.id} className="flex items-center justify-between p-3 border rounded-lg">
+                                                    <div>
+                                                        <h4 className="font-semibold">{result.quizTitle || 'Quiz'}</h4>
+                                                        <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                                                            <div className="flex items-center gap-1">
+                                                                <Trophy className="h-4 w-4" />
+                                                                <span>Score: {Math.round((result.score || 0) * 10) / 10}/{result.totalScore}</span>
+                                                            </div>
+                                                            <div className="flex items-center gap-1">
+                                                                <Calendar className="h-4 w-4" />
+                                                                <span>Completed: {formatDate(result.completedAt)}</span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <div className="text-right">
+                                                        <div className="text-lg font-bold">
+                                                            {result.totalScore > 0 ? Math.round((result.score / result.totalScore) * 100) : 0}%
+                                                        </div>
+                                                        <Button asChild variant="outline" size="sm">
+                                                            <Link href={`/results/${result.id}`}>View Details</Link>
+                                                        </Button>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </CardContent>
+                            </Card>
+                        </div>
+                    )}
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }
